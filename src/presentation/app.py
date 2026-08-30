@@ -1,6 +1,6 @@
 import sys
 import os
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QLabel
 from PySide6.QtCore import Qt
 from src.domain.entities import PhoneConfig
 from src.infrastructure.database.connection import init_db
@@ -26,6 +26,8 @@ def run():
     init_db()
 
     app = QApplication(sys.argv)
+    app.setApplicationName("SmsHks")
+    app.setDisplayName("SmsHks")
     app.setLayoutDirection(Qt.RightToLeft)
 
     stylesheet = _load_stylesheet()
@@ -46,6 +48,10 @@ def run():
     message_repo = SQLMessageRepository()
 
     window = MainWindow(phone_config, contact_repo, template_repo, campaign_repo, message_repo)
+    window.setWindowTitle("SmsHks - مدير الرسائل عبر الهاتف")
+    brand_label = window.findChild(QLabel, "brandTitle")
+    if brand_label is not None:
+        brand_label.setText("SmsHks")
     window.show()
 
     exit_code = app.exec()
