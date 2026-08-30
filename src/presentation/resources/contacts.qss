@@ -1,0 +1,53 @@
+/* Contact management workspace */
+
+QFrame#contactSummaryCard {
+    background: #f8fbff;
+    border: 1px solid #dbe7f3;
+    border-radius: 9px;
+}
+
+QLabel#contactSummaryTitle {
+    color: #64748b;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+QLabel#contactSummaryValue {
+    color: #145fa5;
+    font-size: 22px;
+    font-weight: 800;
+}
+
+QFrame#contactToolbarCard {
+    background: #fbfdff;
+    border: 1px solid #dbe4ef;
+    border-radius: 9px;
+}
+
+QLineEdit#contactSearch {
+    min-height: 30px;
+    font-size: 13px;
+}
+
+QTableWidget#contactsTable {
+    border: 1px solid #dbe4ef;
+    border-radius: 9px;
+}
+
+QTableWidget#contactsTable::item {
+    min-height: 30px;
+}
+
+QLabel#importHint {
+    color: #64748b;
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 7px 10px;
+    font-size: 11px;
+}
+
+QLabel#contactFooter {
+    color: #64748b;
+    font-weight: 600;
+    padding: 4px 2px;
+}
