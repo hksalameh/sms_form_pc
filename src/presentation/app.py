@@ -11,17 +11,26 @@ from src.infrastructure.database.repository import (
 from src.presentation.main_window import MainWindow
 
 
+def _load_stylesheet() -> str:
+    resources_dir = os.path.join(os.path.dirname(__file__), "resources")
+    parts = []
+    for filename in ("styles.qss", "contacts.qss"):
+        path = os.path.join(resources_dir, filename)
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as file:
+                parts.append(file.read())
+    return "\n\n".join(parts)
+
+
 def run():
     init_db()
 
     app = QApplication(sys.argv)
-
     app.setLayoutDirection(Qt.RightToLeft)
 
-    qss_path = os.path.join(os.path.dirname(__file__), "resources", "styles.qss")
-    if os.path.exists(qss_path):
-        with open(qss_path, encoding="utf-8") as f:
-            app.setStyleSheet(f.read())
+    stylesheet = _load_stylesheet()
+    if stylesheet:
+        app.setStyleSheet(stylesheet)
 
     settings_repo = SettingsRepository()
     phone_config = PhoneConfig(
