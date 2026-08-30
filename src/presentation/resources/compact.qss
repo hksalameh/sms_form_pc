@@ -1,0 +1,165 @@
+/* Compact proportional layout overrides */
+
+QWidget {
+    font-size: 12px;
+}
+
+QLabel#brandTitle {
+    font-size: 20px;
+}
+
+QLabel#brandSubtitle {
+    font-size: 12px;
+}
+
+QLabel#pageTitle {
+    font-size: 20px;
+}
+
+QLabel#pageSubtitle {
+    font-size: 11px;
+}
+
+QPushButton {
+    min-height: 24px;
+    padding: 5px 11px;
+}
+
+QLineEdit,
+QTextEdit,
+QPlainTextEdit,
+QSpinBox,
+QComboBox {
+    min-height: 24px;
+    padding: 5px 8px;
+}
+
+QPushButton#navButton {
+    padding: 8px 10px;
+    font-size: 12px;
+}
+
+QPushButton#topPrimaryButton {
+    min-width: 105px;
+}
+
+QFrame#phonePanel {
+    border-radius: 8px;
+}
+
+QLabel#phoneIndicatorUnknown,
+QLabel#phoneIndicatorConnected,
+QLabel#phoneIndicatorDisconnected,
+QLabel#phoneIndicatorChecking {
+    font-size: 20px;
+    padding: 0;
+}
+
+QLabel#phoneState {
+    font-size: 12px;
+}
+
+QLabel#phoneAddress {
+    font-size: 10px;
+    padding: 5px 6px;
+}
+
+QLabel#panelHint {
+    padding: 6px;
+    font-size: 10px;
+}
+
+QGroupBox {
+    margin-top: 10px;
+    padding: 12px 10px 8px 10px;
+}
+
+QTableWidget::item {
+    padding: 5px 8px;
+}
+
+QHeaderView::section {
+    padding: 6px 8px;
+}
+
+QPushButton#workspaceModeButton {
+    min-width: 110px;
+}
+
+QFrame#composerCard {
+    border-radius: 7px;
+}
+
+QLabel#sectionTitle {
+    font-size: 15px;
+}
+
+QLabel#fieldLabel {
+    min-width: 76px;
+    font-size: 11px;
+}
+
+QTextEdit#messageEditor {
+    min-height: 300px;
+    font-size: 15px;
+    padding: 12px;
+}
+
+QFrame#composerActionBar {
+    border-radius: 6px;
+}
+
+/* Contacts: numbers are information, not oversized cards. */
+QFrame#contactStatsBar {
+    background: #f8fbff;
+    border: 1px solid #dbe7f3;
+    border-radius: 7px;
+    max-height: 38px;
+}
+
+QFrame#contactStat {
+    background: transparent;
+    border: 0;
+}
+
+QLabel#contactStatTitle {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+QLabel#contactStatValue {
+    color: #145fa5;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+QFrame#contactToolbarCard {
+    background: #fbfdff;
+    border: 1px solid #dbe4ef;
+    border-radius: 7px;
+    max-height: 48px;
+}
+
+QLineEdit#contactSearch {
+    min-height: 24px;
+    font-size: 12px;
+}
+
+QTableWidget#contactsTable {
+    border-radius: 7px;
+}
+
+QLabel#importHint {
+    color: #64748b;
+    background: transparent;
+    padding: 2px 4px;
+    font-size: 10px;
+}
+
+QLabel#contactFooter {
+    color: #64748b;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px;
+}
