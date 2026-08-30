@@ -11,6 +11,7 @@ import android.view.ViewGroup;
 import android.widget.Button;
 import android.widget.LinearLayout;
 import android.widget.TextView;
+import android.widget.Toast;
 
 public class MainActivity extends Activity {
     private static final int SMS_PERMISSION_REQUEST = 1001;
@@ -75,6 +76,7 @@ public class MainActivity extends Activity {
     private void ensureSmsPermissionAndStart() {
         if (checkSelfPermission(Manifest.permission.SEND_SMS) != PackageManager.PERMISSION_GRANTED) {
             statusView.setText("يجب السماح بصلاحية إرسال SMS");
+            Toast.makeText(this, "اسمح بصلاحية إرسال الرسائل حتى يعمل SmsHks", Toast.LENGTH_LONG).show();
             requestPermissions(new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_REQUEST);
             return;
         }
@@ -82,9 +84,20 @@ public class MainActivity extends Activity {
     }
 
     private void startSmsService() {
-        Intent serviceIntent = new Intent(this, SmsHttpService.class);
-        startForegroundService(serviceIntent);
-        statusView.setText("الخدمة تعمل على المنفذ 8000\nيمكنك العودة إلى SmsHks على الكمبيوتر");
+        statusView.setText("جاري تشغيل خدمة SmsHks...");
+        try {
+            Intent serviceIntent = new Intent(this, SmsHttpService.class);
+            startForegroundService(serviceIntent);
+            statusView.setText("الخدمة تعمل على المنفذ 8000\nاترك USB debugging مفعلاً ثم اضغط فحص الاتصال على الكمبيوتر");
+            Toast.makeText(this, "تم تشغيل خدمة SmsHks", Toast.LENGTH_SHORT).show();
+        } catch (Exception ex) {
+            String detail = ex.getMessage();
+            if (detail == null || detail.trim().isEmpty()) {
+                detail = ex.getClass().getSimpleName();
+            }
+            statusView.setText("تعذر تشغيل خدمة SmsHks\n" + detail);
+            Toast.makeText(this, "فشل تشغيل الخدمة: " + detail, Toast.LENGTH_LONG).show();
+        }
     }
 
     @Override
@@ -93,9 +106,11 @@ public class MainActivity extends Activity {
         if (requestCode == SMS_PERMISSION_REQUEST
                 && grantResults.length > 0
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            Toast.makeText(this, "تم منح صلاحية SMS", Toast.LENGTH_SHORT).show();
             startSmsService();
         } else if (requestCode == SMS_PERMISSION_REQUEST) {
             statusView.setText("لم يتم منح صلاحية SMS. لن يستطيع البرنامج إرسال الرسائل.");
+            Toast.makeText(this, "بدون صلاحية SMS لا يمكن إرسال الرسائل", Toast.LENGTH_LONG).show();
         }
     }
 }
