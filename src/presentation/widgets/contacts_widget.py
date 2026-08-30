@@ -77,13 +77,13 @@ class ContactsWidget(QWidget):
         btn_add.clicked.connect(self._add_contact)
         toolbar_layout.addWidget(btn_add)
 
-        btn_import_excel = QPushButton("استيراد Excel")
-        btn_import_excel.setObjectName("secondaryAction")
-        btn_import_excel.setToolTip(
+        btn_import_text = QPushButton("استيراد TXT / CSV")
+        btn_import_text.setObjectName("secondaryAction")
+        btn_import_text.setToolTip(
             "إذا كان رقم الهاتف ناقص الصفر الأول فسيتم إضافته تلقائيًا أثناء الاستيراد"
         )
-        btn_import_excel.clicked.connect(self._import_excel)
-        toolbar_layout.addWidget(btn_import_excel)
+        btn_import_text.clicked.connect(self._import_txt)
+        toolbar_layout.addWidget(btn_import_text)
 
         more_btn = QPushButton("المزيد ▾")
         more_btn.setObjectName("secondaryAction")
@@ -103,9 +103,9 @@ class ContactsWidget(QWidget):
 
         more_menu.addSeparator()
 
-        action_import_text = QAction("استيراد TXT / CSV", more_menu)
-        action_import_text.triggered.connect(self._import_txt)
-        more_menu.addAction(action_import_text)
+        action_import_excel = QAction("استيراد Excel", more_menu)
+        action_import_excel.triggered.connect(self._import_excel)
+        more_menu.addAction(action_import_excel)
 
         action_add_group = QAction("مجموعة جديدة", more_menu)
         action_add_group.triggered.connect(self._add_group)
