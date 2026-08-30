@@ -14,7 +14,7 @@ from src.presentation.main_window import MainWindow
 def _load_stylesheet() -> str:
     resources_dir = os.path.join(os.path.dirname(__file__), "resources")
     parts = []
-    for filename in ("styles.qss", "contacts.qss"):
+    for filename in ("styles.qss", "contacts.qss", "compact.qss"):
         path = os.path.join(resources_dir, filename)
         if os.path.exists(path):
             with open(path, encoding="utf-8") as file:
