@@ -39,7 +39,7 @@ class CampaignWorker(QObject):
             if campaign and campaign.status == CampaignStatus.CANCELLED:
                 self.finished.emit("تم إيقاف الإرسال")
             elif campaign and campaign.status == CampaignStatus.PAUSED:
-                self.finished.emit("توقفت الحملة مع رسائل معلقة")
+                self.finished.emit("توقفت عملية الإرسال مع رسائل معلقة")
             else:
                 self.finished.emit("اكتمل الإرسال")
         except Exception as e:
@@ -70,15 +70,15 @@ class CampaignsWidget(QWidget):
 
         actions = QHBoxLayout()
         actions.setSpacing(8)
-        btn_new = QPushButton("حملة جديدة")
+        btn_new = QPushButton("رسالة جديدة")
         btn_new.clicked.connect(self._new_campaign)
         actions.addWidget(btn_new)
 
-        btn_view = QPushButton("عرض التفاصيل")
+        btn_view = QPushButton("تفاصيل الإرسال")
         btn_view.clicked.connect(self._view_campaign)
         actions.addWidget(btn_view)
 
-        btn_delete = QPushButton("حذف")
+        btn_delete = QPushButton("حذف عملية الإرسال")
         btn_delete.setObjectName("btnDanger")
         btn_delete.clicked.connect(self._delete_campaign)
         actions.addWidget(btn_delete)
@@ -88,7 +88,7 @@ class CampaignsWidget(QWidget):
         self._table = QTableWidget()
         self._table.setColumnCount(6)
         self._table.setHorizontalHeaderLabels([
-            "الاسم", "الحالة", "إجمالي", "تم الإرسال", "فشل", "التاريخ"
+            "اسم العملية", "الحالة", "إجمالي الرسائل", "تم الإرسال", "فشل", "التاريخ"
         ])
         self._table.horizontalHeader().setStretchLastSection(True)
         self._table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
@@ -98,7 +98,7 @@ class CampaignsWidget(QWidget):
         self._table.setAlternatingRowColors(True)
         layout.addWidget(self._table)
 
-        control_group = QGroupBox("التحكم بالإرسال")
+        control_group = QGroupBox("التحكم بعملية الإرسال")
         control_layout = QHBoxLayout(control_group)
 
         self._progress_bar = QProgressBar()
@@ -167,14 +167,14 @@ class CampaignsWidget(QWidget):
             saved, messages = self._service.prepare_campaign(saved)
             QMessageBox.information(
                 self, "تم",
-                f"تم إنشاء الحملة '{saved.name}' بنجاح\nإجمالي الرسائل: {saved.total_messages}"
+                f"تم إنشاء عملية الإرسال '{saved.name}' بنجاح\nإجمالي الرسائل: {saved.total_messages}"
             )
             self.refresh()
 
     def _view_campaign(self):
         row = self._table.currentRow()
         if row < 0:
-            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار حملة")
+            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار عملية إرسال")
             return
         campaign_id = self._table.item(row, 0).data(256)
         campaign = self._service.get_by_id(campaign_id)
@@ -187,10 +187,14 @@ class CampaignsWidget(QWidget):
     def _delete_campaign(self):
         row = self._table.currentRow()
         if row < 0:
-            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار حملة")
+            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار عملية إرسال")
             return
         campaign_id = self._table.item(row, 0).data(256)
-        confirm = QMessageBox.question(self, "تأكيد", "هل أنت متأكد من حذف الحملة؟")
+        confirm = QMessageBox.question(
+            self,
+            "تأكيد",
+            "هل أنت متأكد من حذف عملية الإرسال وسجل رسائلها؟",
+        )
         if confirm == QMessageBox.Yes:
             self._service.delete(campaign_id)
             self.refresh()
@@ -198,17 +202,17 @@ class CampaignsWidget(QWidget):
     def _start_sending(self):
         row = self._table.currentRow()
         if row < 0:
-            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار حملة")
+            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار عملية إرسال")
             return
         campaign_id = self._table.item(row, 0).data(256)
         campaign = self._service.get_by_id(campaign_id)
         if not campaign:
             return
         if self._running or campaign.status == CampaignStatus.RUNNING:
-            QMessageBox.warning(self, "تنبيه", "الحملة قيد الإرسال بالفعل")
+            QMessageBox.warning(self, "تنبيه", "عملية الإرسال قيد التنفيذ بالفعل")
             return
         if campaign.total_messages == 0:
-            QMessageBox.warning(self, "تنبيه", "لا توجد رسائل في هذه الحملة")
+            QMessageBox.warning(self, "تنبيه", "لا توجد رسائل في عملية الإرسال هذه")
             return
 
         self._current_campaign_id = campaign_id
@@ -293,7 +297,7 @@ class CampaignDialog(QDialog):
         super().__init__(parent)
         self._groups = groups
         self._templates = templates
-        self.setWindowTitle("حملة جديدة")
+        self.setWindowTitle("إنشاء رسالة جديدة")
         self.setMinimumWidth(500)
         self._build_ui()
 
@@ -302,7 +306,8 @@ class CampaignDialog(QDialog):
 
         form = QFormLayout()
         self._name_input = QLineEdit()
-        form.addRow("اسم الحملة:", self._name_input)
+        self._name_input.setPlaceholderText("اختياري - سيتم إنشاء اسم تلقائي إذا تركته فارغاً")
+        form.addRow("اسم عملية الإرسال:", self._name_input)
         layout.addLayout(form)
 
         self._template_combo = QComboBox()
@@ -317,12 +322,13 @@ class CampaignDialog(QDialog):
         self._group_combo.addItem("كل جهات الاتصال", None)
         for g in self._groups:
             self._group_combo.addItem(g, g)
-        layout.addWidget(QLabel("مجموعة جهات الاتصال:"))
+        layout.addWidget(QLabel("المستلمون / المجموعة:"))
         layout.addWidget(self._group_combo)
 
         layout.addWidget(QLabel("نص الرسالة:"))
         self._content_input = QTextEdit()
         self._content_input.setMinimumHeight(120)
+        self._content_input.setPlaceholderText("اكتب نص الرسالة هنا...")
         layout.addWidget(self._content_input)
 
         self._info_label = QLabel("")
@@ -347,6 +353,8 @@ class CampaignDialog(QDialog):
         layout.addLayout(retry_row)
 
         buttons = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
+        buttons.button(QDialogButtonBox.Ok).setText("إنشاء")
+        buttons.button(QDialogButtonBox.Cancel).setText("إلغاء")
         buttons.accepted.connect(self.accept)
         buttons.rejected.connect(self.reject)
         layout.addWidget(buttons)
@@ -364,14 +372,17 @@ class CampaignDialog(QDialog):
         text = self._content_input.toPlainText()
         parts, per_part = estimate_sms_parts(text)
         self._info_label.setText(
-            f"الأحرف: {len(text)} | الأجزاء: {parts}"
+            f"الأحرف: {len(text)} | أجزاء SMS المتوقعة: {parts}"
         )
 
     @property
     def campaign(self) -> Campaign:
         template_id = self._template_combo.currentData()
+        operation_name = self._name_input.text().strip()
+        if not operation_name:
+            operation_name = f"إرسال {datetime.now().strftime('%Y-%m-%d %H:%M')}"
         return Campaign(
-            name=self._name_input.text().strip() or "حملة جديدة",
+            name=operation_name,
             template_id=template_id,
             template_content=self._content_input.toPlainText(),
             group_name=self._group_combo.currentData(),
@@ -383,7 +394,7 @@ class CampaignDialog(QDialog):
 class CampaignDetailDialog(QDialog):
     def __init__(self, campaign: Campaign, messages: list[Message], parent=None):
         super().__init__(parent)
-        self.setWindowTitle(f"تفاصيل الحملة: {campaign.name}")
+        self.setWindowTitle(f"تفاصيل الإرسال: {campaign.name}")
         self.setMinimumSize(700, 500)
         self._build_ui(campaign, messages)
 
