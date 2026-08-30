@@ -19,6 +19,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Locale;
@@ -29,6 +30,7 @@ public class SmsHttpService extends Service {
     private static final String CHANNEL_ID = "smshks_phone_service";
     private static final int NOTIFICATION_ID = 8100;
     private static final int PORT = 8000;
+    private static final int CLIENT_TIMEOUT_MS = 5000;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
     private volatile boolean running = false;
@@ -75,7 +77,9 @@ public class SmsHttpService extends Service {
         running = true;
         executor.execute(() -> {
             try {
-                serverSocket = new ServerSocket(PORT);
+                serverSocket = new ServerSocket();
+                serverSocket.setReuseAddress(true);
+                serverSocket.bind(new java.net.InetSocketAddress(PORT));
                 while (running) {
                     Socket socket = serverSocket.accept();
                     executor.execute(() -> handleClient(socket));
@@ -91,56 +95,66 @@ public class SmsHttpService extends Service {
              BufferedInputStream input = new BufferedInputStream(client.getInputStream());
              BufferedOutputStream output = new BufferedOutputStream(client.getOutputStream())) {
 
-            HttpRequest request = readRequest(input);
-            if (request == null) {
-                writeJson(output, 400, json(false, "طلب غير صالح"));
-                return;
-            }
+            client.setSoTimeout(CLIENT_TIMEOUT_MS);
 
-            if ("GET".equals(request.method) && "/health".equals(request.path)) {
-                JSONObject response = new JSONObject();
-                response.put("status", canSendSms() ? "connected" : "permission_required");
-                response.put("app", "SmsHks Phone");
-                response.put("version", "1.0.0");
-                response.put("port", PORT);
-                writeJson(output, 200, response.toString());
-                return;
-            }
-
-            if ("POST".equals(request.method) && "/send".equals(request.path)) {
-                if (!canSendSms()) {
-                    writeJson(output, 403, json(false, "صلاحية إرسال SMS غير ممنوحة"));
+            try {
+                HttpRequest request = readRequest(input);
+                if (request == null) {
+                    writeJson(output, 400, json(false, "طلب غير صالح"));
                     return;
                 }
 
-                JSONObject body = new JSONObject(request.body == null ? "{}" : request.body);
-                String phone = body.optString("phone", "").trim();
-                String text = body.optString("text", "").trim();
-
-                if (!phone.matches("^\\+?[0-9]{3,20}$")) {
-                    writeJson(output, 400, json(false, "رقم الهاتف غير صالح"));
-                    return;
-                }
-                if (text.isEmpty()) {
-                    writeJson(output, 400, json(false, "نص الرسالة فارغ"));
+                if ("GET".equals(request.method) && "/health".equals(request.path)) {
+                    String status = canSendSms() ? "connected" : "permission_required";
+                    String response = "{\"status\":\"" + status
+                            + "\",\"app\":\"SmsHks Phone\",\"version\":\"1.0.3\",\"port\":"
+                            + PORT + "}";
+                    writeJson(output, 200, response);
                     return;
                 }
 
+                if ("POST".equals(request.method) && "/send".equals(request.path)) {
+                    if (!canSendSms()) {
+                        writeJson(output, 403, json(false, "صلاحية إرسال SMS غير ممنوحة"));
+                        return;
+                    }
+
+                    JSONObject body = new JSONObject(request.body == null ? "{}" : request.body);
+                    String phone = body.optString("phone", "").trim();
+                    String text = body.optString("text", "").trim();
+
+                    if (!phone.matches("^\\+?[0-9]{3,20}$")) {
+                        writeJson(output, 400, json(false, "رقم الهاتف غير صالح"));
+                        return;
+                    }
+                    if (text.isEmpty()) {
+                        writeJson(output, 400, json(false, "نص الرسالة فارغ"));
+                        return;
+                    }
+
+                    try {
+                        sendSms(phone, text);
+                        JSONObject response = new JSONObject();
+                        response.put("success", true);
+                        response.put("message_id", "android-queued");
+                        response.put("error", "");
+                        writeJson(output, 200, response.toString());
+                    } catch (Exception ex) {
+                        writeJson(output, 500, json(false, ex.getMessage() == null ? "فشل الإرسال" : ex.getMessage()));
+                    }
+                    return;
+                }
+
+                writeJson(output, 404, json(false, "المسار غير موجود"));
+            } catch (SocketTimeoutException timeout) {
+                writeJson(output, 408, json(false, "انتهت مهلة طلب الكمبيوتر"));
+            } catch (Throwable error) {
                 try {
-                    sendSms(phone, text);
-                    JSONObject response = new JSONObject();
-                    response.put("success", true);
-                    response.put("message_id", "android-queued");
-                    response.put("error", "");
-                    writeJson(output, 200, response.toString());
-                } catch (Exception ex) {
-                    writeJson(output, 500, json(false, ex.getMessage() == null ? "فشل الإرسال" : ex.getMessage()));
+                    writeJson(output, 500, json(false, "خطأ داخلي في خدمة SmsHks Phone"));
+                } catch (Throwable ignored) {
                 }
-                return;
             }
-
-            writeJson(output, 404, json(false, "المسار غير موجود"));
-        } catch (Exception ignored) {
+        } catch (Throwable ignored) {
         }
     }
 
@@ -181,7 +195,13 @@ public class SmsHttpService extends Service {
             }
         }
 
-        String headers = headerBytes.toString(StandardCharsets.UTF_8);
+        if (headerBytes.size() == 0) {
+            return null;
+        }
+
+        // Avoid ByteArrayOutputStream.toString(Charset), which is not available
+        // on some older Android runtimes even when the APK compiles with Java 17.
+        String headers = new String(headerBytes.toByteArray(), StandardCharsets.UTF_8);
         String[] lines = headers.split("\\r\\n");
         if (lines.length == 0) {
             return null;
