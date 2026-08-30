@@ -20,7 +20,7 @@ class ReportsWidget(QWidget):
         actions = QHBoxLayout()
         self._campaign_combo = QComboBox()
         self._campaign_combo.setMinimumWidth(250)
-        actions.addWidget(QLabel("اختر الحملة:"))
+        actions.addWidget(QLabel("اختر عملية الإرسال:"))
         actions.addWidget(self._campaign_combo)
 
         btn_export_excel = QPushButton("تصدير تقرير Excel")
@@ -31,7 +31,7 @@ class ReportsWidget(QWidget):
         btn_export_pdf.clicked.connect(lambda: self._export(ExportFormat.PDF))
         actions.addWidget(btn_export_pdf)
 
-        btn_all = QPushButton("تصدير جميع الحملات")
+        btn_all = QPushButton("تصدير جميع عمليات الإرسال")
         btn_all.clicked.connect(self._export_all)
         actions.addWidget(btn_all)
         layout.addLayout(actions)
@@ -68,7 +68,7 @@ class ReportsWidget(QWidget):
     def _export(self, fmt: ExportFormat):
         campaign_id = self._campaign_combo.currentData()
         if not campaign_id:
-            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار حملة")
+            QMessageBox.warning(self, "تنبيه", "الرجاء اختيار عملية إرسال")
             return
         ext = "xlsx" if fmt == ExportFormat.EXCEL else "pdf"
         path, _ = QFileDialog.getSaveFileName(self, "حفظ التقرير", f"report.{ext}", f"*.{ext}")
@@ -78,7 +78,12 @@ class ReportsWidget(QWidget):
         QMessageBox.information(self, "تصدير", f"تم حفظ التقرير في:\n{path}")
 
     def _export_all(self):
-        path, _ = QFileDialog.getSaveFileName(self, "حفظ التقرير", "all_campaigns.xlsx", "Excel (*.xlsx)")
+        path, _ = QFileDialog.getSaveFileName(
+            self,
+            "حفظ التقرير",
+            "send_operations.xlsx",
+            "Excel (*.xlsx)",
+        )
         if not path:
             return
         self._service.export_all_campaigns(path)
