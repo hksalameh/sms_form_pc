@@ -4,6 +4,7 @@ from typing import Optional
 import httpx
 
 from src.domain.entities import PhoneConfig
+from src.infrastructure.sms.android_companion import ensure_companion_app
 from src.infrastructure.sms.device_detector import (
     detect_android_usb,
     detect_usb_tethering_gateway,
@@ -56,18 +57,26 @@ class PhoneHttpClient:
         self.config.ip_address = gateway
 
     async def health_check(self) -> tuple[bool, str]:
-        """Quickly detect the Android device, tethering IP, and SMS service."""
+        """Detect Android, install/launch SmsHks Phone if possible, then probe its service."""
         usb_task = asyncio.create_task(
             asyncio.to_thread(detect_android_usb, self.HEALTH_TIMEOUT_SECONDS)
         )
         gateway_task = asyncio.create_task(
             asyncio.to_thread(detect_usb_tethering_gateway, self.HEALTH_TIMEOUT_SECONDS)
         )
+        companion_task = asyncio.create_task(
+            asyncio.to_thread(ensure_companion_app, True)
+        )
         configured_probe = asyncio.create_task(self._probe_health())
 
         configured_ok, configured_status = await configured_probe
         if configured_ok:
             return True, "connected"
+
+        try:
+            companion_ready, companion_status = await companion_task
+        except Exception as exc:
+            companion_ready, companion_status = False, str(exc)
 
         try:
             usb_found, device_name = await usb_task
@@ -79,35 +88,47 @@ class PhoneHttpClient:
         except Exception:
             gateway = ""
 
+        # Re-detect the tethering gateway after installing/launching the companion.
+        if companion_ready and not gateway:
+            try:
+                gateway = await asyncio.to_thread(detect_usb_tethering_gateway, 1.5)
+            except Exception:
+                gateway = ""
+
         gateway_status = ""
-        if gateway and gateway != self.config.ip_address:
-            gateway_ok, gateway_status = await self._probe_health(
-                f"http://{gateway}:{self.config.port}"
-            )
+        if gateway:
+            base_url = f"http://{gateway}:{self.config.port}"
+            gateway_ok, gateway_status = await self._probe_health(base_url)
             if gateway_ok:
                 await self._switch_to_gateway(gateway)
                 return True, "connected"
+
+        if not companion_ready:
+            if usb_found:
+                label = f" ({device_name})" if device_name else ""
+                return True, f"تم العثور على هاتف Android{label}، لكن {companion_status}"
+            return False, companion_status or "لم يتم العثور على هاتف Android جاهز"
 
         service_status = gateway_status or configured_status
         if usb_found:
             label = f" ({device_name})" if device_name else ""
             if gateway:
                 return True, (
-                    f"تم العثور على هاتف Android موصول{label} وعنوانه {gateway}، "
-                    f"لكن خدمة الإرسال غير جاهزة: {service_status}"
+                    f"تم تجهيز تطبيق SmsHks Phone على الهاتف{label} وعنوانه {gateway}، "
+                    f"لكن خدمة الإرسال لم تستجب بعد: {service_status}"
                 )
             return True, (
-                f"تم العثور على هاتف Android موصول{label}، "
-                "لكن USB Tethering أو خدمة الإرسال غير جاهزة"
+                f"تم تجهيز تطبيق SmsHks Phone على الهاتف{label}، "
+                "لكن USB Tethering غير فعال. فعّله ثم أعد الفحص"
             )
 
         if gateway:
             return True, (
-                f"تم العثور على اتصال USB Tethering بعنوان {gateway}، "
+                f"تم تجهيز تطبيق الهاتف وعُثر على USB Tethering بعنوان {gateway}، "
                 f"لكن خدمة الإرسال غير جاهزة: {service_status}"
             )
 
-        return False, "لم يتم العثور على هاتف Android موصول أو USB Tethering فعال"
+        return False, "تم تجهيز تطبيق الهاتف لكن لم يتم العثور على USB Tethering"
 
     async def _post_sms(self, base_url: Optional[str], phone: str, text: str):
         headers = {"X-API-Token": self.config.api_token} if self.config.api_token else {}
@@ -138,6 +159,13 @@ class PhoneHttpClient:
             if data.get("success"):
                 return True, data.get("message_id", "")
             return False, data.get("error", "فشل الإرسال من الهاتف")
+        try:
+            data = resp.json()
+            detail = data.get("error") or data.get("detail")
+            if detail:
+                return False, str(detail)
+        except Exception:
+            pass
         return False, f"HTTP {resp.status_code}: {resp.text}"
 
     async def send_sms(self, phone: str, text: str) -> tuple[bool, str]:
@@ -145,8 +173,14 @@ class PhoneHttpClient:
             resp = await self._post_sms(None, phone, text)
             return self._parse_send_response(resp)
         except (httpx.ConnectError, httpx.ConnectTimeout):
+            # If the phone app stopped or was never installed, repair it automatically.
+            try:
+                await asyncio.to_thread(ensure_companion_app, True)
+            except Exception:
+                pass
+
             gateway = await asyncio.to_thread(detect_usb_tethering_gateway, 1.5)
-            if gateway and gateway != self.config.ip_address:
+            if gateway:
                 try:
                     resp = await self._post_sms(
                         f"http://{gateway}:{self.config.port}",
@@ -161,7 +195,7 @@ class PhoneHttpClient:
                     return False, "انتهت مهلة الاتصال بخدمة الإرسال على الهاتف"
                 except httpx.ConnectError:
                     pass
-            return False, "تعذر الاتصال بخدمة الإرسال على الهاتف"
+            return False, "تعذر الاتصال بخدمة SmsHks Phone على الهاتف"
         except httpx.TimeoutException:
             return False, "انتهت مهلة الاتصال بالهاتف"
         except Exception as e:
