@@ -3,7 +3,7 @@ from PySide6.QtWidgets import (
     QLineEdit, QSpinBox, QTableWidget, QTableWidgetItem,
     QGroupBox, QMessageBox, QHeaderView,
 )
-from src.domain.entities import PhoneConfig, Campaign
+from src.domain.entities import PhoneConfig
 from src.application.sms.sender import SmsSender
 from src.application.services.template_service import TemplateService
 from src.presentation.widgets.phone_settings_dialog import PhoneSettingsDialog
@@ -38,7 +38,7 @@ class SettingsWidget(QWidget):
         phone_layout.addWidget(btn_health)
         layout.addWidget(phone_group)
 
-        default_group = QGroupBox("الإعدادات الافتراضية للحملات")
+        default_group = QGroupBox("إعدادات الإرسال الافتراضية")
         defaults_layout = QVBoxLayout(default_group)
 
         delay_row = QHBoxLayout()
