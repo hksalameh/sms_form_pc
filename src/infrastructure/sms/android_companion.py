@@ -8,6 +8,8 @@ from typing import Optional
 
 COMPANION_PACKAGE = "com.smshks.companion"
 COMPANION_ACTIVITY = f"{COMPANION_PACKAGE}/.MainActivity"
+HOST_PORT = 8000
+DEVICE_PORT = 8000
 
 
 def _bundle_root() -> str:
@@ -122,8 +124,30 @@ def _launch_companion(adb: str, serial: str) -> None:
         pass
 
 
+def _setup_port_forward(adb: str, serial: str) -> tuple[bool, str]:
+    """Map localhost:8000 on Windows directly to port 8000 on the USB phone."""
+    try:
+        result = _run_adb(
+            adb,
+            ["-s", serial, "forward", f"tcp:{HOST_PORT}", f"tcp:{DEVICE_PORT}"],
+            timeout=4.0,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "انتهت مهلة إنشاء قناة USB المباشرة"
+    except OSError as exc:
+        return False, f"تعذر إنشاء قناة USB: {exc}"
+
+    if result.returncode == 0:
+        return True, ""
+
+    output = f"{result.stdout}\n{result.stderr}".strip()
+    if not output:
+        output = "ADB forward failed"
+    return False, f"تعذر ربط منفذ USB: {output[-220:]}"
+
+
 def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
-    """Ensure SmsHks Phone is installed and launched on an authorized Android device."""
+    """Ensure SmsHks Phone is installed, launched and reachable through USB ADB."""
     adb = _find_adb()
     if not adb:
         return False, "ADB غير موجود داخل نسخة SmsHks"
@@ -159,8 +183,12 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
 
     if installed:
         _grant_permissions(adb, serial)
+        forward_ok, forward_error = _setup_port_forward(adb, serial)
+        if not forward_ok:
+            return False, forward_error
+
         _launch_companion(adb, serial)
-        time.sleep(0.7)
-        return True, "تطبيق SmsHks Phone موجود وتم تشغيله"
+        time.sleep(0.9)
+        return True, "تطبيق SmsHks Phone جاهز وقناة USB المباشرة تعمل"
 
     return False, "تعذر تجهيز تطبيق SmsHks Phone"
