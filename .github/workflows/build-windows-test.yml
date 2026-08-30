@@ -12,11 +12,29 @@ permissions:
 jobs:
   build-windows:
     runs-on: windows-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.9"
+
+      - name: Build Android companion APK
+        shell: pwsh
+        run: |
+          gradle -p android_app :app:assembleDebug --no-daemon
+          New-Item -ItemType Directory -Force -Path bundle\android | Out-Null
+          Copy-Item android_app\app\build\outputs\apk\debug\app-debug.apk bundle\android\SmsHks-Phone.apk
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -37,18 +55,36 @@ jobs:
       - name: Run tests
         run: python -m pytest tests -q
 
+      - name: Prepare bundled ADB
+        shell: pwsh
+        run: |
+          $adbDir = Join-Path $env:ANDROID_HOME "platform-tools"
+          if (-not (Test-Path (Join-Path $adbDir "adb.exe"))) {
+            throw "adb.exe was not found in Android SDK platform-tools"
+          }
+          New-Item -ItemType Directory -Force -Path bundle\adb | Out-Null
+          Copy-Item (Join-Path $adbDir "adb.exe") bundle\adb\adb.exe
+          Copy-Item (Join-Path $adbDir "AdbWinApi.dll") bundle\adb\AdbWinApi.dll
+          Copy-Item (Join-Path $adbDir "AdbWinUsbApi.dll") bundle\adb\AdbWinUsbApi.dll
+
       - name: Build Windows executable
         shell: pwsh
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed `
             --name "SmsHks-Test" `
             --add-data "src/presentation/resources;src/presentation/resources" `
+            --add-data "bundle/android/SmsHks-Phone.apk;android" `
+            --add-binary "bundle/adb/adb.exe;adb" `
+            --add-binary "bundle/adb/AdbWinApi.dll;adb" `
+            --add-binary "bundle/adb/AdbWinUsbApi.dll;adb" `
             main.py
 
-      - name: Upload Windows executable
+      - name: Upload Windows and Android test files
         uses: actions/upload-artifact@v4
         with:
           name: SmsHks-Windows-Test
-          path: dist/SmsHks-Test.exe
+          path: |
+            dist/SmsHks-Test.exe
+            bundle/android/SmsHks-Phone.apk
           if-no-files-found: error
           retention-days: 14
