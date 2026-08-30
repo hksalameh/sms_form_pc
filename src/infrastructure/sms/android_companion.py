@@ -1,4 +1,5 @@
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -8,6 +9,7 @@ from typing import Optional
 
 COMPANION_PACKAGE = "com.smshks.companion"
 COMPANION_ACTIVITY = f"{COMPANION_PACKAGE}/.MainActivity"
+COMPANION_VERSION_CODE = 2
 HOST_PORT = 8000
 DEVICE_PORT = 8000
 
@@ -97,6 +99,45 @@ def _is_installed(adb: str, serial: str) -> bool:
     return result.returncode == 0 and "package:" in (result.stdout or "")
 
 
+def _installed_version_code(adb: str, serial: str) -> Optional[int]:
+    try:
+        result = _run_adb(
+            adb,
+            ["-s", serial, "shell", "dumpsys", "package", COMPANION_PACKAGE],
+            timeout=5.0,
+        )
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+
+    if result.returncode != 0:
+        return None
+    match = re.search(r"versionCode=(\d+)", result.stdout or "")
+    if not match:
+        return None
+    try:
+        return int(match.group(1))
+    except ValueError:
+        return None
+
+
+def _install_apk(adb: str, serial: str, apk: str) -> tuple[bool, str]:
+    try:
+        result = _run_adb(
+            adb,
+            ["-s", serial, "install", "-r", apk],
+            timeout=45.0,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "استغرق تثبيت تطبيق الهاتف وقتاً طويلاً"
+    except OSError as exc:
+        return False, f"تعذر تثبيت تطبيق الهاتف: {exc}"
+
+    output = f"{result.stdout}\n{result.stderr}"
+    if result.returncode != 0 or "Success" not in output:
+        return False, f"فشل تثبيت تطبيق الهاتف: {output.strip()[-220:]}"
+    return True, ""
+
+
 def _grant_permissions(adb: str, serial: str) -> None:
     permissions = [
         "android.permission.SEND_SMS",
@@ -147,7 +188,7 @@ def _setup_port_forward(adb: str, serial: str) -> tuple[bool, str]:
 
 
 def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
-    """Ensure SmsHks Phone is installed, launched and reachable through USB ADB."""
+    """Ensure the current SmsHks Phone is installed, launched and reachable over USB."""
     adb = _find_adb()
     if not adb:
         return False, "ADB غير موجود داخل نسخة SmsHks"
@@ -157,28 +198,23 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
         return False, error
 
     installed = _is_installed(adb, serial)
-    if not installed:
+    installed_version = _installed_version_code(adb, serial) if installed else None
+    needs_install = not installed
+    needs_upgrade = installed and installed_version is not None and installed_version < COMPANION_VERSION_CODE
+
+    if needs_install or needs_upgrade:
         if not auto_install:
+            if needs_upgrade:
+                return False, "الهاتف متصل لكن تطبيق SmsHks Phone يحتاج تحديثاً"
             return False, "الهاتف متصل لكن تطبيق SmsHks Phone غير مثبت"
 
         apk = _find_companion_apk()
         if not apk:
             return False, "ملف SmsHks Phone APK غير موجود داخل البرنامج"
 
-        try:
-            result = _run_adb(
-                adb,
-                ["-s", serial, "install", "-r", apk],
-                timeout=45.0,
-            )
-        except subprocess.TimeoutExpired:
-            return False, "استغرق تثبيت تطبيق الهاتف وقتاً طويلاً"
-        except OSError as exc:
-            return False, f"تعذر تثبيت تطبيق الهاتف: {exc}"
-
-        output = f"{result.stdout}\n{result.stderr}"
-        if result.returncode != 0 or "Success" not in output:
-            return False, f"فشل تثبيت تطبيق الهاتف: {output.strip()[-220:]}"
+        install_ok, install_error = _install_apk(adb, serial, apk)
+        if not install_ok:
+            return False, install_error
         installed = True
 
     if installed:
@@ -189,6 +225,8 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
 
         _launch_companion(adb, serial)
         time.sleep(0.9)
+        if needs_upgrade:
+            return True, "تم تحديث SmsHks Phone وتشغيل قناة USB المباشرة"
         return True, "تطبيق SmsHks Phone جاهز وقناة USB المباشرة تعمل"
 
     return False, "تعذر تجهيز تطبيق SmsHks Phone"
