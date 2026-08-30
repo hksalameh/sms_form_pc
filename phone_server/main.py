@@ -42,7 +42,6 @@ class SendResponse(BaseModel):
     error: str = ""
 
 
-
 def verify_api_token(token: Optional[str]) -> None:
     if not REQUIRE_API_TOKEN:
         return
@@ -74,6 +73,7 @@ def sanitize_text(text: str) -> str:
         raise HTTPException(status_code=400, detail="Message text contains unsafe control characters")
     return cleaned
 
+
 def detect_serial_port() -> Optional[str]:
     try:
         import serial.tools.list_ports
@@ -99,22 +99,41 @@ def open_serial(port: str, baud: int = 115200):
         return False
 
 
+async def _read_serial_response(timeout: float) -> str:
+    if not ser or not ser.is_open:
+        return ""
+    response = b""
+    start = asyncio.get_event_loop().time()
+    while asyncio.get_event_loop().time() - start < timeout:
+        if ser.in_waiting:
+            response += ser.read(ser.in_waiting)
+        else:
+            await asyncio.sleep(0.05)
+    return response.decode(errors="replace")
+
+
 async def send_at_command(command: str, timeout: float = 3.0) -> str:
     if not ser or not ser.is_open:
         return ""
     try:
         ser.write((command + "\r").encode())
         await asyncio.sleep(0.1)
-        response = b""
-        start = asyncio.get_event_loop().time()
-        while asyncio.get_event_loop().time() - start < timeout:
-            if ser.in_waiting:
-                response += ser.read(ser.in_waiting)
-            else:
-                await asyncio.sleep(0.05)
-        return response.decode(errors="replace")
+        return await _read_serial_response(timeout)
     except Exception as e:
         logger.error(f"AT command error: {e}")
+        return ""
+
+
+async def send_sms_body(text: str, timeout: float = 10.0) -> str:
+    """Send SMS body and the real Ctrl+Z byte required by AT+CMGS."""
+    if not ser or not ser.is_open:
+        return ""
+    try:
+        ser.write(text.encode() + b"\x1a")
+        await asyncio.sleep(0.1)
+        return await _read_serial_response(timeout)
+    except Exception as e:
+        logger.error(f"SMS body send error: {e}")
         return ""
 
 
@@ -125,7 +144,7 @@ async def send_sms_serial(phone: str, text: str) -> tuple[bool, str]:
             if "OK" not in resp:
                 return False, "Device is not responding"
 
-            resp = await send_at_command('AT+CMGF=1')
+            resp = await send_at_command("AT+CMGF=1")
             if "OK" not in resp:
                 return False, "Failed to set text mode"
 
@@ -133,7 +152,7 @@ async def send_sms_serial(phone: str, text: str) -> tuple[bool, str]:
             if ">" not in resp:
                 return False, "Failed to start sending"
 
-            resp = await send_at_command(text + "\\x1a", timeout=10.0)
+            resp = await send_sms_body(text, timeout=10.0)
             if "OK" in resp or "CMGS" in resp:
                 return True, "Sent"
             return False, f"Send failed: {resp[:100]}"
@@ -176,7 +195,6 @@ async def send_sms(req: SendRequest, x_api_token: Optional[str] = Header(default
     text = sanitize_text(req.text)
     success, msg = await send_sms_serial(phone, text)
     return SendResponse(success=success, error="" if success else msg)
-
 
 
 if __name__ == "__main__":
