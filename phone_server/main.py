@@ -73,7 +73,6 @@ def sanitize_text(text: str) -> str:
         raise HTTPException(status_code=400, detail="Message text contains unsafe control characters")
     return cleaned
 
-
 def detect_serial_port() -> Optional[str]:
     try:
         import serial.tools.list_ports
@@ -129,7 +128,7 @@ async def send_sms_body(text: str, timeout: float = 10.0) -> str:
     if not ser or not ser.is_open:
         return ""
     try:
-        ser.write(text.encode() + b"\x1a")
+        ser.write(text.encode() + bytes([26]))
         await asyncio.sleep(0.1)
         return await _read_serial_response(timeout)
     except Exception as e:
@@ -144,7 +143,7 @@ async def send_sms_serial(phone: str, text: str) -> tuple[bool, str]:
             if "OK" not in resp:
                 return False, "Device is not responding"
 
-            resp = await send_at_command("AT+CMGF=1")
+            resp = await send_at_command('AT+CMGF=1')
             if "OK" not in resp:
                 return False, "Failed to set text mode"
 
