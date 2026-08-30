@@ -9,6 +9,7 @@ from typing import Optional
 
 COMPANION_PACKAGE = "com.smshks.companion"
 COMPANION_ACTIVITY = f"{COMPANION_PACKAGE}/.MainActivity"
+COMPANION_SERVICE = f"{COMPANION_PACKAGE}/.SmsHttpService"
 COMPANION_VERSION_CODE = 3
 HOST_PORT = 8000
 DEVICE_PORT = 8000
@@ -140,9 +141,6 @@ def _install_apk(adb: str, serial: str, apk: str) -> tuple[bool, str]:
     if result.returncode == 0 and "Success" in output:
         return True, ""
 
-    # GitHub test builds can be signed by different ephemeral debug keys.
-    # If Android rejects an upgrade because signatures differ, replace only
-    # the phone companion app and then permissions are granted again below.
     if "INSTALL_FAILED_UPDATE_INCOMPATIBLE" in output or "signatures do not match" in output.lower():
         try:
             uninstall = _run_adb(
@@ -181,23 +179,39 @@ def _grant_permissions(adb: str, serial: str) -> None:
             pass
 
 
-def _launch_companion(adb: str, serial: str) -> None:
-    """Launch the helper in background mode; its UI only stays visible on a problem."""
+def _start_service_silently(adb: str, serial: str) -> tuple[bool, str]:
+    """Start the Android helper service without opening its activity/UI."""
     try:
-        _run_adb(
+        result = _run_adb(
             adb,
             [
                 "-s",
                 serial,
                 "shell",
                 "am",
-                "start",
+                "start-foreground-service",
                 "-n",
-                COMPANION_ACTIVITY,
-                "--ez",
-                "smshks_background",
-                "true",
+                COMPANION_SERVICE,
             ],
+            timeout=4.0,
+        )
+    except subprocess.TimeoutExpired:
+        return False, "استغرق تشغيل خدمة الهاتف وقتاً طويلاً"
+    except OSError as exc:
+        return False, f"تعذر تشغيل خدمة الهاتف: {exc}"
+
+    output = f"{result.stdout}\n{result.stderr}".strip()
+    if result.returncode == 0 and "Error" not in output and "Exception" not in output:
+        return True, ""
+    return False, output[-220:] or "تعذر تشغيل خدمة SmsHks Phone"
+
+
+def _launch_companion_ui(adb: str, serial: str) -> None:
+    """Open the helper UI only when user interaction may be required."""
+    try:
+        _run_adb(
+            adb,
+            ["-s", serial, "shell", "am", "start", "-n", COMPANION_ACTIVITY],
             timeout=4.0,
         )
     except (OSError, subprocess.TimeoutExpired):
@@ -227,7 +241,7 @@ def _setup_port_forward(adb: str, serial: str) -> tuple[bool, str]:
 
 
 def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
-    """Ensure the current SmsHks Phone is installed, launched and reachable over USB."""
+    """Ensure SmsHks Phone exists and its service is reachable over direct USB."""
     adb = _find_adb()
     if not adb:
         return False, "ADB غير موجود داخل نسخة SmsHks"
@@ -237,14 +251,8 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
         return False, error
 
     installed = _is_installed(adb, serial)
-    installed_version = _installed_version_code(adb, serial) if installed else None
-    needs_install = not installed
-    needs_upgrade = installed and installed_version is not None and installed_version < COMPANION_VERSION_CODE
-
-    if needs_install or needs_upgrade:
+    if not installed:
         if not auto_install:
-            if needs_upgrade:
-                return False, "الهاتف متصل لكن تطبيق SmsHks Phone يحتاج تحديثاً"
             return False, "الهاتف متصل لكن تطبيق SmsHks Phone غير مثبت"
 
         apk = _find_companion_apk()
@@ -254,18 +262,24 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
         install_ok, install_error = _install_apk(adb, serial, apk)
         if not install_ok:
             return False, install_error
-        installed = True
 
-    if installed:
-        _grant_permissions(adb, serial)
-        forward_ok, forward_error = _setup_port_forward(adb, serial)
-        if not forward_ok:
-            return False, forward_error
+    # Do not reinstall/upgrade an already installed helper during every health check.
+    # Repeated USB installs are slow and some Android vendors require an extra approval.
+    _grant_permissions(adb, serial)
 
-        _launch_companion(adb, serial)
-        time.sleep(0.9)
-        if needs_upgrade:
-            return True, "تم تحديث SmsHks Phone وتشغيل قناة USB المباشرة"
-        return True, "تطبيق SmsHks Phone جاهز وقناة USB المباشرة تعمل"
+    forward_ok, forward_error = _setup_port_forward(adb, serial)
+    if not forward_ok:
+        return False, forward_error
 
-    return False, "تعذر تجهيز تطبيق SmsHks Phone"
+    service_ok, service_error = _start_service_silently(adb, serial)
+    if not service_ok:
+        _launch_companion_ui(adb, serial)
+        return False, f"تطبيق الهاتف موجود لكن تعذر تشغيل الخدمة: {service_error}"
+
+    time.sleep(0.45)
+    installed_version = _installed_version_code(adb, serial)
+    version_note = ""
+    if installed_version is not None and installed_version < COMPANION_VERSION_CODE:
+        version_note = " (يمكن تحديث تطبيق الهاتف لاحقاً، لكن الاتصال يعمل بالإصدار الحالي)"
+
+    return True, f"تطبيق SmsHks Phone جاهز وقناة USB المباشرة تعمل{version_note}"
