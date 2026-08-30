@@ -72,6 +72,7 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed `
             --name "SmsHks-Test" `
+            --icon "src/presentation/resources/smshks.ico" `
             --add-data "src/presentation/resources;src/presentation/resources" `
             --add-data "bundle/android/SmsHks-Phone.apk;android" `
             --add-binary "bundle/adb/adb.exe;adb" `
