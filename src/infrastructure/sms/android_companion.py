@@ -9,7 +9,7 @@ from typing import Optional
 
 COMPANION_PACKAGE = "com.smshks.companion"
 COMPANION_ACTIVITY = f"{COMPANION_PACKAGE}/.MainActivity"
-COMPANION_VERSION_CODE = 2
+COMPANION_VERSION_CODE = 3
 HOST_PORT = 8000
 DEVICE_PORT = 8000
 
@@ -182,10 +182,22 @@ def _grant_permissions(adb: str, serial: str) -> None:
 
 
 def _launch_companion(adb: str, serial: str) -> None:
+    """Launch the helper in background mode; its UI only stays visible on a problem."""
     try:
         _run_adb(
             adb,
-            ["-s", serial, "shell", "am", "start", "-n", COMPANION_ACTIVITY],
+            [
+                "-s",
+                serial,
+                "shell",
+                "am",
+                "start",
+                "-n",
+                COMPANION_ACTIVITY,
+                "--ez",
+                "smshks_background",
+                "true",
+            ],
             timeout=4.0,
         )
     except (OSError, subprocess.TimeoutExpired):
