@@ -1,4 +1,4 @@
-name: Build Windows test version
+name: Build SmsHks Windows test version
 
 on:
   push:
@@ -41,14 +41,14 @@ jobs:
         shell: pwsh
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed `
-            --name "SMSCaster-Test" `
+            --name "SmsHks-Test" `
             --add-data "src/presentation/resources;src/presentation/resources" `
             main.py
 
       - name: Upload Windows executable
         uses: actions/upload-artifact@v4
         with:
-          name: SMSCaster-Windows-Test
-          path: dist/SMSCaster-Test.exe
+          name: SmsHks-Windows-Test
+          path: dist/SmsHks-Test.exe
           if-no-files-found: error
           retention-days: 14
