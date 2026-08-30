@@ -2,6 +2,7 @@ import sys
 import os
 from PySide6.QtWidgets import QApplication, QLabel
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QIcon
 from src.domain.entities import PhoneConfig
 from src.infrastructure.database.connection import init_db
 from src.infrastructure.database.repository import (
@@ -9,6 +10,10 @@ from src.infrastructure.database.repository import (
     SQLCampaignRepository, SQLMessageRepository, SettingsRepository,
 )
 from src.presentation.main_window import MainWindow
+
+
+def _resource_path(filename: str) -> str:
+    return os.path.join(os.path.dirname(__file__), "resources", filename)
 
 
 def _load_stylesheet() -> str:
@@ -29,6 +34,11 @@ def run():
     app.setApplicationName("SmsHks")
     app.setLayoutDirection(Qt.RightToLeft)
 
+    icon_path = _resource_path("smshks.ico")
+    app_icon = QIcon(icon_path) if os.path.exists(icon_path) else QIcon()
+    if not app_icon.isNull():
+        app.setWindowIcon(app_icon)
+
     stylesheet = _load_stylesheet()
     if stylesheet:
         app.setStyleSheet(stylesheet)
@@ -48,6 +58,8 @@ def run():
 
     window = MainWindow(phone_config, contact_repo, template_repo, campaign_repo, message_repo)
     window.setWindowTitle("SmsHks - مدير الرسائل عبر الهاتف")
+    if not app_icon.isNull():
+        window.setWindowIcon(app_icon)
     brand_label = window.findChild(QLabel, "brandTitle")
     if brand_label is not None:
         brand_label.setText("SmsHks")
