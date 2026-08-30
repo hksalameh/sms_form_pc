@@ -9,7 +9,7 @@ from typing import Optional
 
 COMPANION_PACKAGE = "com.smshks.companion"
 COMPANION_ACTIVITY = f"{COMPANION_PACKAGE}/.MainActivity"
-COMPANION_VERSION_CODE = 3
+COMPANION_VERSION_CODE = 4
 HOST_PORT = 8000
 DEVICE_PORT = 8000
 
@@ -243,7 +243,7 @@ def _setup_port_forward(adb: str, serial: str) -> tuple[bool, str]:
 
 
 def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
-    """Ensure SmsHks Phone exists and its service is reachable over direct USB."""
+    """Ensure the compatible SmsHks Phone version exists and is reachable over direct USB."""
     adb = _find_adb()
     if not adb:
         return False, "ADB غير موجود داخل نسخة SmsHks"
@@ -253,8 +253,17 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
         return False, error
 
     installed = _is_installed(adb, serial)
-    if not installed:
+    installed_version = _installed_version_code(adb, serial) if installed else None
+    needs_upgrade = (
+        installed
+        and installed_version is not None
+        and installed_version < COMPANION_VERSION_CODE
+    )
+
+    if not installed or needs_upgrade:
         if not auto_install:
+            if needs_upgrade:
+                return False, "الهاتف متصل لكن تطبيق SmsHks Phone يحتاج تحديثاً للتوافق"
             return False, "الهاتف متصل لكن تطبيق SmsHks Phone غير مثبت"
 
         apk = _find_companion_apk()
@@ -264,6 +273,7 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
         install_ok, install_error = _install_apk(adb, serial, apk)
         if not install_ok:
             return False, install_error
+        installed = True
 
     _grant_permissions(adb, serial)
 
@@ -276,10 +286,7 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
         _launch_companion_ui(adb, serial)
         return False, f"تطبيق الهاتف موجود لكن تعذر تشغيل الخدمة: {service_error}"
 
-    time.sleep(0.45)
-    installed_version = _installed_version_code(adb, serial)
-    version_note = ""
-    if installed_version is not None and installed_version < COMPANION_VERSION_CODE:
-        version_note = " (يمكن تحديث تطبيق الهاتف لاحقاً، لكن الاتصال يعمل بالإصدار الحالي)"
-
-    return True, f"تطبيق SmsHks Phone جاهز وقناة USB المباشرة تعمل{version_note}"
+    time.sleep(0.55)
+    if needs_upgrade:
+        return True, "تم تحديث SmsHks Phone إلى إصدار متوافق وقناة USB المباشرة تعمل"
+    return True, "تطبيق SmsHks Phone جاهز وقناة USB المباشرة تعمل"
