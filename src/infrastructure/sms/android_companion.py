@@ -120,22 +120,49 @@ def _installed_version_code(adb: str, serial: str) -> Optional[int]:
         return None
 
 
+def _install_once(adb: str, serial: str, apk: str) -> subprocess.CompletedProcess:
+    return _run_adb(
+        adb,
+        ["-s", serial, "install", "-r", apk],
+        timeout=45.0,
+    )
+
+
 def _install_apk(adb: str, serial: str, apk: str) -> tuple[bool, str]:
     try:
-        result = _run_adb(
-            adb,
-            ["-s", serial, "install", "-r", apk],
-            timeout=45.0,
-        )
+        result = _install_once(adb, serial, apk)
     except subprocess.TimeoutExpired:
         return False, "استغرق تثبيت تطبيق الهاتف وقتاً طويلاً"
     except OSError as exc:
         return False, f"تعذر تثبيت تطبيق الهاتف: {exc}"
 
     output = f"{result.stdout}\n{result.stderr}"
-    if result.returncode != 0 or "Success" not in output:
-        return False, f"فشل تثبيت تطبيق الهاتف: {output.strip()[-220:]}"
-    return True, ""
+    if result.returncode == 0 and "Success" in output:
+        return True, ""
+
+    # GitHub test builds can be signed by different ephemeral debug keys.
+    # If Android rejects an upgrade because signatures differ, replace only
+    # the phone companion app and then permissions are granted again below.
+    if "INSTALL_FAILED_UPDATE_INCOMPATIBLE" in output or "signatures do not match" in output.lower():
+        try:
+            uninstall = _run_adb(
+                adb,
+                ["-s", serial, "uninstall", COMPANION_PACKAGE],
+                timeout=15.0,
+            )
+            uninstall_output = f"{uninstall.stdout}\n{uninstall.stderr}"
+            if uninstall.returncode != 0 or "Success" not in uninstall_output:
+                return False, f"تعذر إزالة نسخة SmsHks Phone القديمة: {uninstall_output.strip()[-220:]}"
+            result = _install_once(adb, serial, apk)
+            output = f"{result.stdout}\n{result.stderr}"
+            if result.returncode == 0 and "Success" in output:
+                return True, ""
+        except subprocess.TimeoutExpired:
+            return False, "استغرق استبدال تطبيق الهاتف وقتاً طويلاً"
+        except OSError as exc:
+            return False, f"تعذر استبدال تطبيق الهاتف: {exc}"
+
+    return False, f"فشل تثبيت تطبيق الهاتف: {output.strip()[-220:]}"
 
 
 def _grant_permissions(adb: str, serial: str) -> None:
