@@ -16,11 +16,31 @@ import android.widget.Toast;
 public class MainActivity extends Activity {
     private static final int SMS_PERMISSION_REQUEST = 1001;
     private TextView statusView;
+    private String startupError = "";
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        boolean backgroundStart = getIntent() != null
+                && getIntent().getBooleanExtra("smshks_background", false);
+
+        if (backgroundStart
+                && checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED) {
+            if (startServiceSilently()) {
+                finishAndRemoveTask();
+                return;
+            }
+        }
+
         buildUi();
+
+        if (!startupError.isEmpty()) {
+            statusView.setText("تعذر تشغيل خدمة SmsHks\n" + startupError);
+            Toast.makeText(this, "فشل تشغيل الخدمة: " + startupError, Toast.LENGTH_LONG).show();
+            return;
+        }
+
         ensureSmsPermissionAndStart();
     }
 
@@ -80,23 +100,33 @@ public class MainActivity extends Activity {
             requestPermissions(new String[]{Manifest.permission.SEND_SMS}, SMS_PERMISSION_REQUEST);
             return;
         }
-        startSmsService();
+        startSmsServiceFromUi();
     }
 
-    private void startSmsService() {
-        statusView.setText("جاري تشغيل خدمة SmsHks...");
+    private boolean startServiceSilently() {
         try {
             Intent serviceIntent = new Intent(this, SmsHttpService.class);
             startForegroundService(serviceIntent);
-            statusView.setText("الخدمة تعمل على المنفذ 8000\nاترك USB debugging مفعلاً ثم اضغط فحص الاتصال على الكمبيوتر");
-            Toast.makeText(this, "تم تشغيل خدمة SmsHks", Toast.LENGTH_SHORT).show();
+            return true;
         } catch (Exception ex) {
             String detail = ex.getMessage();
             if (detail == null || detail.trim().isEmpty()) {
                 detail = ex.getClass().getSimpleName();
             }
-            statusView.setText("تعذر تشغيل خدمة SmsHks\n" + detail);
-            Toast.makeText(this, "فشل تشغيل الخدمة: " + detail, Toast.LENGTH_LONG).show();
+            startupError = detail;
+            return false;
+        }
+    }
+
+    private void startSmsServiceFromUi() {
+        statusView.setText("جاري تشغيل خدمة SmsHks...");
+        startupError = "";
+        if (startServiceSilently()) {
+            statusView.setText("الخدمة تعمل على المنفذ 8000\nيمكنك العودة إلى SmsHks على الكمبيوتر");
+            Toast.makeText(this, "تم تشغيل خدمة SmsHks", Toast.LENGTH_SHORT).show();
+        } else {
+            statusView.setText("تعذر تشغيل خدمة SmsHks\n" + startupError);
+            Toast.makeText(this, "فشل تشغيل الخدمة: " + startupError, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -107,7 +137,7 @@ public class MainActivity extends Activity {
                 && grantResults.length > 0
                 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
             Toast.makeText(this, "تم منح صلاحية SMS", Toast.LENGTH_SHORT).show();
-            startSmsService();
+            startSmsServiceFromUi();
         } else if (requestCode == SMS_PERMISSION_REQUEST) {
             statusView.setText("لم يتم منح صلاحية SMS. لن يستطيع البرنامج إرسال الرسائل.");
             Toast.makeText(this, "بدون صلاحية SMS لا يمكن إرسال الرسائل", Toast.LENGTH_LONG).show();
