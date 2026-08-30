@@ -238,11 +238,9 @@ public class SmsHttpService extends Service {
     }
 
     private String json(boolean success, String error) {
-        JSONObject response = new JSONObject();
-        response.put("success", success);
-        response.put("message_id", "");
-        response.put("error", error == null ? "" : error);
-        return response.toString();
+        String safeError = JSONObject.quote(error == null ? "" : error);
+        return "{\"success\":" + success
+                + ",\"message_id\":\"\",\"error\":" + safeError + "}";
     }
 
     private void createNotificationChannel() {
