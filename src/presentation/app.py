@@ -2,7 +2,7 @@ import sys
 import os
 from PySide6.QtWidgets import QApplication, QLabel
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QIcon
+from PySide6.QtGui import QIcon, QKeySequence, QShortcut
 from src.domain.entities import PhoneConfig
 from src.infrastructure.database.connection import init_db
 from src.infrastructure.database.repository import (
@@ -25,6 +25,57 @@ def _load_stylesheet() -> str:
             with open(path, encoding="utf-8") as file:
                 parts.append(file.read())
     return "\n\n".join(parts)
+
+
+def _shortcut(parent, sequence: str, callback):
+    shortcut = QShortcut(QKeySequence(sequence), parent)
+    shortcut.setContext(Qt.WidgetWithChildrenShortcut)
+    shortcut.activated.connect(callback)
+    return shortcut
+
+
+def _focus_search(search_input):
+    search_input.setFocus()
+    search_input.selectAll()
+
+
+def _install_keyboard_shortcuts(window: MainWindow):
+    """Install Windows-style shortcuts without changing destructive behaviour."""
+    shortcuts = []
+
+    contacts = getattr(window, "_contacts_widget", None)
+    if contacts is not None:
+        table = getattr(contacts, "_table", None)
+        search = getattr(contacts, "_search_input", None)
+
+        if table is not None:
+            # Only active while the contacts table (or its viewport) has focus.
+            shortcuts.append(_shortcut(table, "Delete", contacts._delete_selected_contacts))
+            shortcuts.append(_shortcut(table, "Ctrl+A", table.selectAll))
+            shortcuts.append(_shortcut(table, "F2", contacts._edit_contact))
+
+        if search is not None:
+            shortcuts.append(
+                _shortcut(contacts, "Ctrl+F", lambda: _focus_search(search))
+            )
+
+    reports = getattr(window, "_reports_widget", None)
+    if reports is not None:
+        report_search = getattr(reports, "_search_input", None)
+        report_table = getattr(reports, "_table", None)
+        if report_search is not None:
+            shortcuts.append(
+                _shortcut(reports, "Ctrl+F", lambda: _focus_search(report_search))
+            )
+        if report_table is not None:
+            shortcuts.append(_shortcut(report_table, "Ctrl+A", report_table.selectAll))
+
+    # Standard safe shortcuts available throughout the desktop application.
+    shortcuts.append(_shortcut(window, "Ctrl+N", window._new_campaign))
+    shortcuts.append(_shortcut(window, "F5", window._refresh_current_page))
+
+    # Keep Python references alive for the whole window lifetime.
+    window._keyboard_shortcuts = shortcuts
 
 
 def run():
@@ -63,6 +114,8 @@ def run():
     brand_label = window.findChild(QLabel, "brandTitle")
     if brand_label is not None:
         brand_label.setText("SmsHks")
+
+    _install_keyboard_shortcuts(window)
     window.show()
 
     exit_code = app.exec()
