@@ -1,10 +1,26 @@
 import os
+import sys
 from contextlib import contextmanager
+
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, scoped_session
 from sqlalchemy.pool import NullPool
 
-DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "..", "smscaster.db")
+
+def _resolve_db_path() -> str:
+    """Return a writable persistent database path for source and packaged builds."""
+    if getattr(sys, "frozen", False):
+        base_dir = os.environ.get("LOCALAPPDATA") or os.path.expanduser("~")
+        app_dir = os.path.join(base_dir, "SMSCaster")
+        os.makedirs(app_dir, exist_ok=True)
+        return os.path.join(app_dir, "smscaster.db")
+
+    return os.path.abspath(
+        os.path.join(os.path.dirname(__file__), "..", "..", "..", "smscaster.db")
+    )
+
+
+DB_PATH = _resolve_db_path()
 
 engine = create_engine(
     f"sqlite:///{DB_PATH}",
@@ -31,4 +47,5 @@ def get_session():
 
 def init_db():
     from .models import Base
+
     Base.metadata.create_all(bind=engine)
