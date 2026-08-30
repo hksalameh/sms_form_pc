@@ -70,11 +70,11 @@ jobs:
           Copy-Item (Join-Path $adbDir "AdbWinApi.dll") bundle\adb\AdbWinApi.dll
           Copy-Item (Join-Path $adbDir "AdbWinUsbApi.dll") bundle\adb\AdbWinUsbApi.dll
 
-      - name: Build Windows executable
+      - name: Build portable Windows application
         shell: pwsh
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed `
-            --name "SmsHks-Test" `
+          pyinstaller --noconfirm --clean --onedir --windowed --noupx `
+            --name "SmsHks-Portable" `
             --icon "src/presentation/resources/smshks.ico" `
             --add-data "src/presentation/resources;src/presentation/resources" `
             --add-data "bundle/android/SmsHks-Phone.apk;android" `
@@ -83,12 +83,17 @@ jobs:
             --add-binary "bundle/adb/AdbWinUsbApi.dll;adb" `
             main.py
 
-      - name: Upload Windows and Android test files
+      - name: Create portable ZIP
+        shell: pwsh
+        run: |
+          Compress-Archive -Path "dist\SmsHks-Portable\*" -DestinationPath "dist\SmsHks-Portable.zip" -Force
+
+      - name: Upload portable Windows and Android test files
         uses: actions/upload-artifact@v4
         with:
-          name: SmsHks-Windows-Test
+          name: SmsHks-Windows-Portable
           path: |
-            dist/SmsHks-Test.exe
+            dist/SmsHks-Portable.zip
             bundle/android/SmsHks-Phone.apk
           if-no-files-found: error
           retention-days: 14
