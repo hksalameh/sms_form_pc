@@ -27,7 +27,6 @@ def run():
 
     app = QApplication(sys.argv)
     app.setApplicationName("SmsHks")
-    app.setDisplayName("SmsHks")
     app.setLayoutDirection(Qt.RightToLeft)
 
     stylesheet = _load_stylesheet()
