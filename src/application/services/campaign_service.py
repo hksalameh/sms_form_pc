@@ -76,6 +76,33 @@ class CampaignService:
         self._campaign_repo.update(campaign)
         return campaign, messages
 
+    def retry_failed_messages(self, campaign_id: int) -> int:
+        """Reset only failed messages so the same send operation can retry them."""
+        campaign = self._campaign_repo.get_by_id(campaign_id)
+        if not campaign:
+            return 0
+
+        messages = self._message_repo.get_by_campaign(campaign_id)
+        failed_messages = [m for m in messages if m.status == MessageStatus.FAILED]
+        if not failed_messages:
+            return 0
+
+        for message in failed_messages:
+            message.status = MessageStatus.PENDING
+            message.retry_count = 0
+            message.error_message = ""
+            message.sent_at = None
+            message.max_retries = campaign.max_retries
+
+        self._message_repo.update_batch(failed_messages)
+
+        campaign.sent_count = sum(1 for m in messages if m.status == MessageStatus.SENT)
+        campaign.failed_count = 0
+        campaign.status = CampaignStatus.DRAFT
+        campaign.completed_at = None
+        self._campaign_repo.update(campaign)
+        return len(failed_messages)
+
     async def start_campaign(self, campaign_id: int,
                               progress_callback: Optional[Callable] = None) -> None:
         campaign = self._campaign_repo.get_by_id(campaign_id)
