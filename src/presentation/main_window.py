@@ -8,7 +8,6 @@ from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
     QPushButton,
-    QSizePolicy,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
@@ -33,7 +32,7 @@ from src.presentation.widgets.settings_widget import SettingsWidget
 
 
 class PhoneHealthWorker(QObject):
-    finished = Signal(bool, str)
+    finished = Signal(bool, str, str)
 
     def __init__(self, config: PhoneConfig):
         super().__init__()
@@ -49,9 +48,9 @@ class PhoneHealthWorker(QObject):
         sender = SmsSender(self._config)
         try:
             success, message = asyncio.run(sender.check_health())
-            self.finished.emit(success, message)
+            self.finished.emit(success, message, self._config.ip_address)
         except Exception as exc:
-            self.finished.emit(False, str(exc))
+            self.finished.emit(False, str(exc), self._config.ip_address)
 
 
 class MainWindow(QMainWindow):
@@ -87,8 +86,8 @@ class MainWindow(QMainWindow):
         self._health_worker = None
         self._nav_buttons = []
 
-        self.setWindowTitle("SMSCaster - مدير الرسائل عبر الهاتف")
-        self.setMinimumSize(1180, 720)
+        self.setWindowTitle("SmsHks - مدير الرسائل عبر الهاتف")
+        self.setMinimumSize(1080, 680)
         self.resize(1380, 820)
         self._build_ui()
         self._show_page(self.PAGE_CAMPAIGNS)
@@ -104,8 +103,8 @@ class MainWindow(QMainWindow):
 
         body = QWidget()
         body_layout = QHBoxLayout(body)
-        body_layout.setContentsMargins(14, 12, 14, 12)
-        body_layout.setSpacing(12)
+        body_layout.setContentsMargins(10, 9, 10, 9)
+        body_layout.setSpacing(9)
 
         body_layout.addWidget(self._build_sidebar())
         body_layout.addWidget(self._build_content(), 1)
@@ -123,10 +122,10 @@ class MainWindow(QMainWindow):
         topbar = QFrame()
         topbar.setObjectName("topBar")
         layout = QHBoxLayout(topbar)
-        layout.setContentsMargins(18, 10, 18, 10)
-        layout.setSpacing(10)
+        layout.setContentsMargins(14, 7, 14, 7)
+        layout.setSpacing(8)
 
-        brand = QLabel("SMSCaster")
+        brand = QLabel("SmsHks")
         brand.setObjectName("brandTitle")
         layout.addWidget(brand)
 
@@ -140,25 +139,15 @@ class MainWindow(QMainWindow):
         btn_new.clicked.connect(self._new_campaign)
         layout.addWidget(btn_new)
 
-        btn_refresh = QPushButton("↻  تحديث")
-        btn_refresh.setObjectName("topSecondaryButton")
-        btn_refresh.clicked.connect(self._refresh_current_page)
-        layout.addWidget(btn_refresh)
-
-        self._btn_health = QPushButton("●  فحص الاتصال")
-        self._btn_health.setObjectName("topConnectionButton")
-        self._btn_health.clicked.connect(self._check_phone_health)
-        layout.addWidget(self._btn_health)
-
         return topbar
 
     def _build_sidebar(self) -> QWidget:
         sidebar = QFrame()
         sidebar.setObjectName("sideBar")
-        sidebar.setFixedWidth(220)
+        sidebar.setFixedWidth(185)
         layout = QVBoxLayout(sidebar)
-        layout.setContentsMargins(10, 14, 10, 14)
-        layout.setSpacing(6)
+        layout.setContentsMargins(8, 10, 8, 10)
+        layout.setSpacing(4)
 
         caption = QLabel("التنقل")
         caption.setObjectName("sideCaption")
@@ -187,25 +176,6 @@ class MainWindow(QMainWindow):
             layout.addWidget(button)
 
         layout.addStretch()
-
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setObjectName("sideSeparator")
-        layout.addWidget(separator)
-
-        phone_caption = QLabel("الهاتف المتصل")
-        phone_caption.setObjectName("sideCaption")
-        layout.addWidget(phone_caption)
-
-        self._side_phone_status = QLabel("●  لم يتم الفحص")
-        self._side_phone_status.setObjectName("phoneStatusUnknown")
-        layout.addWidget(self._side_phone_status)
-
-        self._side_phone_address = QLabel(self._phone_address_text())
-        self._side_phone_address.setObjectName("mutedText")
-        self._side_phone_address.setWordWrap(True)
-        layout.addWidget(self._side_phone_address)
-
         return sidebar
 
     def _build_content(self) -> QWidget:
@@ -218,8 +188,8 @@ class MainWindow(QMainWindow):
         header = QWidget()
         header.setObjectName("pageHeader")
         header_layout = QVBoxLayout(header)
-        header_layout.setContentsMargins(20, 16, 20, 12)
-        header_layout.setSpacing(3)
+        header_layout.setContentsMargins(16, 10, 16, 8)
+        header_layout.setSpacing(1)
 
         self._page_title = QLabel("")
         self._page_title.setObjectName("pageTitle")
@@ -260,64 +230,41 @@ class MainWindow(QMainWindow):
     def _build_phone_panel(self) -> QWidget:
         panel = QFrame()
         panel.setObjectName("phonePanel")
-        panel.setFixedWidth(235)
+        panel.setFixedWidth(185)
         layout = QVBoxLayout(panel)
-        layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(7)
 
         title = QLabel("حالة الهاتف")
         title.setObjectName("panelTitle")
         layout.addWidget(title)
 
+        status_row = QHBoxLayout()
+        status_row.setSpacing(6)
         self._phone_indicator = QLabel("●")
         self._phone_indicator.setObjectName("phoneIndicatorUnknown")
-        self._phone_indicator.setAlignment(self._phone_indicator.alignment())
-        layout.addWidget(self._phone_indicator)
+        self._phone_indicator.setFixedWidth(22)
+        status_row.addWidget(self._phone_indicator)
 
         self._phone_state = QLabel("لم يتم فحص الاتصال")
         self._phone_state.setObjectName("phoneState")
         self._phone_state.setWordWrap(True)
-        layout.addWidget(self._phone_state)
+        status_row.addWidget(self._phone_state, 1)
+        layout.addLayout(status_row)
 
         self._phone_address = QLabel(self._phone_address_text())
         self._phone_address.setObjectName("phoneAddress")
         self._phone_address.setWordWrap(True)
         layout.addWidget(self._phone_address)
 
-        self._panel_health_button = QPushButton("فحص الاتصال الآن")
+        self._panel_health_button = QPushButton("فحص الاتصال")
         self._panel_health_button.setObjectName("panelActionButton")
         self._panel_health_button.clicked.connect(self._check_phone_health)
         layout.addWidget(self._panel_health_button)
 
-        separator = QFrame()
-        separator.setFrameShape(QFrame.HLine)
-        separator.setObjectName("panelSeparator")
-        layout.addWidget(separator)
-
-        summary_title = QLabel("وصول سريع")
-        summary_title.setObjectName("panelTitle")
-        layout.addWidget(summary_title)
-
-        quick_contacts = QPushButton("جهات الاتصال")
-        quick_contacts.setObjectName("quickLink")
-        quick_contacts.clicked.connect(lambda: self._show_page(self.PAGE_CONTACTS))
-        layout.addWidget(quick_contacts)
-
-        quick_campaigns = QPushButton("عمليات الإرسال")
-        quick_campaigns.setObjectName("quickLink")
-        quick_campaigns.clicked.connect(lambda: self._show_page(self.PAGE_CAMPAIGNS))
-        layout.addWidget(quick_campaigns)
-
-        quick_reports = QPushButton("التقارير")
-        quick_reports.setObjectName("quickLink")
-        quick_reports.clicked.connect(lambda: self._show_page(self.PAGE_REPORTS))
-        layout.addWidget(quick_reports)
-
         layout.addStretch()
 
-        hint = QLabel(
-            "يفضل فحص اتصال الهاتف قبل بدء أي عملية إرسال."
-        )
+        hint = QLabel("الاتصال يتم مباشرة عبر USB عند تفعيل USB debugging.")
         hint.setObjectName("panelHint")
         hint.setWordWrap(True)
         layout.addWidget(hint)
@@ -347,7 +294,7 @@ class MainWindow(QMainWindow):
                 "إعداد اتصال الهاتف والقوالب وخيارات الإرسال.",
             ),
         }
-        title, subtitle = titles.get(index, ("SMSCaster", ""))
+        title, subtitle = titles.get(index, ("SmsHks", ""))
         self._page_title.setText(title)
         self._page_subtitle.setText(subtitle)
 
@@ -379,8 +326,7 @@ class MainWindow(QMainWindow):
         if self._health_thread is not None:
             return
 
-        self._set_phone_status("checking", "جاري فحص الاتصال...")
-        self._btn_health.setEnabled(False)
+        self._set_phone_status("checking", "جاري الفحص...")
         self._panel_health_button.setEnabled(False)
 
         self._health_thread = QThread(self)
@@ -394,39 +340,38 @@ class MainWindow(QMainWindow):
         self._health_thread.finished.connect(self._clear_health_worker)
         self._health_thread.start()
 
-    def _on_phone_health_result(self, success: bool, message: str):
+    def _on_phone_health_result(self, success: bool, message: str, address: str):
         connected = success and str(message).lower() == "connected"
+
+        if connected and address:
+            self._config.ip_address = address
+            self._sender._client = None
+            self._phone_address.setText(self._phone_address_text())
+
         if connected:
-            self._set_phone_status("connected", "الهاتف متصل وجاهز")
+            self._set_phone_status("connected", "متصل وجاهز")
         elif success:
-            self._set_phone_status("disconnected", f"الهاتف غير جاهز: {message}")
+            self._set_phone_status("disconnected", f"غير جاهز: {message}")
         else:
             self._set_phone_status("disconnected", f"تعذر الاتصال: {message}")
 
     def _set_phone_status(self, state: str, text: str):
         object_names = {
-            "connected": ("phoneIndicatorConnected", "phoneStatusConnected"),
-            "disconnected": ("phoneIndicatorDisconnected", "phoneStatusDisconnected"),
-            "checking": ("phoneIndicatorChecking", "phoneStatusChecking"),
+            "connected": "phoneIndicatorConnected",
+            "disconnected": "phoneIndicatorDisconnected",
+            "checking": "phoneIndicatorChecking",
         }
-        indicator_name, side_name = object_names.get(
-            state, ("phoneIndicatorUnknown", "phoneStatusUnknown")
-        )
+        indicator_name = object_names.get(state, "phoneIndicatorUnknown")
         self._phone_indicator.setObjectName(indicator_name)
-        self._side_phone_status.setObjectName(side_name)
         self._phone_indicator.style().unpolish(self._phone_indicator)
         self._phone_indicator.style().polish(self._phone_indicator)
-        self._side_phone_status.style().unpolish(self._side_phone_status)
-        self._side_phone_status.style().polish(self._side_phone_status)
 
         self._phone_state.setText(text)
-        self._side_phone_status.setText(f"●  {text}")
         self._status_phone.setText(f"الهاتف: {text}")
 
     def _clear_health_worker(self):
         self._health_thread = None
         self._health_worker = None
-        self._btn_health.setEnabled(True)
         self._panel_health_button.setEnabled(True)
 
     def _update_config(self, config: PhoneConfig):
@@ -434,7 +379,7 @@ class MainWindow(QMainWindow):
         self._config.port = config.port
         self._config.timeout_ms = config.timeout_ms
         self._config.api_token = config.api_token
-        self._sender._config = config
+        self._sender._config = self._config
         self._sender._client = None
         self._campaign_service = CampaignService(
             self._campaign_repo,
@@ -444,7 +389,5 @@ class MainWindow(QMainWindow):
         )
         self._campaigns_widget.set_service(self._campaign_service)
 
-        address = self._phone_address_text()
-        self._phone_address.setText(address)
-        self._side_phone_address.setText(address)
-        self._set_phone_status("unknown", "لم يتم فحص الاتصال بعد تغيير الإعدادات")
+        self._phone_address.setText(self._phone_address_text())
+        self._set_phone_status("unknown", "لم يتم الفحص بعد تغيير الإعدادات")
