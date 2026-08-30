@@ -9,7 +9,6 @@ from typing import Optional
 
 COMPANION_PACKAGE = "com.smshks.companion"
 COMPANION_ACTIVITY = f"{COMPANION_PACKAGE}/.MainActivity"
-COMPANION_SERVICE = f"{COMPANION_PACKAGE}/.SmsHttpService"
 COMPANION_VERSION_CODE = 3
 HOST_PORT = 8000
 DEVICE_PORT = 8000
@@ -180,7 +179,7 @@ def _grant_permissions(adb: str, serial: str) -> None:
 
 
 def _start_service_silently(adb: str, serial: str) -> tuple[bool, str]:
-    """Start the Android helper service without opening its activity/UI."""
+    """Ask the exported activity to start its own private service, then close immediately."""
     try:
         result = _run_adb(
             adb,
@@ -189,21 +188,24 @@ def _start_service_silently(adb: str, serial: str) -> tuple[bool, str]:
                 serial,
                 "shell",
                 "am",
-                "start-foreground-service",
+                "start",
                 "-n",
-                COMPANION_SERVICE,
+                COMPANION_ACTIVITY,
+                "--ez",
+                "smshks_background",
+                "true",
             ],
             timeout=4.0,
         )
     except subprocess.TimeoutExpired:
-        return False, "استغرق تشغيل خدمة الهاتف وقتاً طويلاً"
+        return False, "استغرق تشغيل تطبيق الهاتف وقتاً طويلاً"
     except OSError as exc:
-        return False, f"تعذر تشغيل خدمة الهاتف: {exc}"
+        return False, f"تعذر تشغيل تطبيق الهاتف: {exc}"
 
     output = f"{result.stdout}\n{result.stderr}".strip()
     if result.returncode == 0 and "Error" not in output and "Exception" not in output:
         return True, ""
-    return False, output[-220:] or "تعذر تشغيل خدمة SmsHks Phone"
+    return False, output[-220:] or "تعذر تشغيل SmsHks Phone"
 
 
 def _launch_companion_ui(adb: str, serial: str) -> None:
@@ -263,8 +265,6 @@ def ensure_companion_app(auto_install: bool = True) -> tuple[bool, str]:
         if not install_ok:
             return False, install_error
 
-    # Do not reinstall/upgrade an already installed helper during every health check.
-    # Repeated USB installs are slow and some Android vendors require an extra approval.
     _grant_permissions(adb, serial)
 
     forward_ok, forward_error = _setup_port_forward(adb, serial)
