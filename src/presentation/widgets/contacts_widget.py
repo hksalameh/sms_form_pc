@@ -1,4 +1,5 @@
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QComboBox,
@@ -10,6 +11,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QMenu,
     QMessageBox,
     QPushButton,
     QTableWidget,
@@ -34,104 +36,98 @@ class ContactsWidget(QWidget):
 
     def _build_ui(self):
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 16, 18, 18)
-        layout.setSpacing(12)
+        layout.setContentsMargins(12, 10, 12, 10)
+        layout.setSpacing(8)
 
-        summary = QHBoxLayout()
-        summary.setSpacing(10)
-        total_card, self._total_value = self._build_summary_card("إجمالي جهات الاتصال", "0")
-        groups_card, self._groups_value = self._build_summary_card("المجموعات", "0")
-        visible_card, self._visible_value = self._build_summary_card("الظاهر حاليًا", "0")
-        summary.addWidget(total_card)
-        summary.addWidget(groups_card)
-        summary.addWidget(visible_card)
-        layout.addLayout(summary)
+        stats_bar = QFrame()
+        stats_bar.setObjectName("contactStatsBar")
+        stats_layout = QHBoxLayout(stats_bar)
+        stats_layout.setContentsMargins(10, 5, 10, 5)
+        stats_layout.setSpacing(14)
 
-        filter_card = QFrame()
-        filter_card.setObjectName("contactToolbarCard")
-        filter_layout = QVBoxLayout(filter_card)
-        filter_layout.setContentsMargins(14, 12, 14, 12)
-        filter_layout.setSpacing(10)
+        total_box, self._total_value = self._build_stat("جهات الاتصال", "0")
+        groups_box, self._groups_value = self._build_stat("المجموعات", "0")
+        visible_box, self._visible_value = self._build_stat("الظاهر", "0")
+        stats_layout.addWidget(total_box)
+        stats_layout.addWidget(groups_box)
+        stats_layout.addWidget(visible_box)
+        stats_layout.addStretch()
+        layout.addWidget(stats_bar)
 
-        filters = QHBoxLayout()
-        filters.setSpacing(8)
+        toolbar = QFrame()
+        toolbar.setObjectName("contactToolbarCard")
+        toolbar_layout = QHBoxLayout(toolbar)
+        toolbar_layout.setContentsMargins(10, 7, 10, 7)
+        toolbar_layout.setSpacing(7)
 
         self._search_input = QLineEdit()
         self._search_input.setObjectName("contactSearch")
         self._search_input.setPlaceholderText("بحث بالاسم أو رقم الهاتف أو المجموعة...")
         self._search_input.setClearButtonEnabled(True)
         self._search_input.textChanged.connect(self._apply_filters)
-        filters.addWidget(self._search_input, 1)
+        toolbar_layout.addWidget(self._search_input, 1)
 
-        filters.addWidget(QLabel("المجموعة:"))
         self._group_combo = QComboBox()
-        self._group_combo.setMinimumWidth(190)
+        self._group_combo.setMinimumWidth(150)
+        self._group_combo.setMaximumWidth(190)
         self._group_combo.currentIndexChanged.connect(self._apply_filters)
-        filters.addWidget(self._group_combo)
+        toolbar_layout.addWidget(self._group_combo)
 
-        clear_filter = QPushButton("مسح الفلاتر")
-        clear_filter.setObjectName("secondaryAction")
-        clear_filter.clicked.connect(self._clear_filters)
-        filters.addWidget(clear_filter)
-        filter_layout.addLayout(filters)
-
-        primary_actions = QHBoxLayout()
-        primary_actions.setSpacing(8)
-
-        btn_add = QPushButton("+  إضافة جهة اتصال")
+        btn_add = QPushButton("+ إضافة")
         btn_add.clicked.connect(self._add_contact)
-        primary_actions.addWidget(btn_add)
-
-        btn_edit = QPushButton("تعديل")
-        btn_edit.setObjectName("secondaryAction")
-        btn_edit.clicked.connect(self._edit_contact)
-        primary_actions.addWidget(btn_edit)
-
-        btn_move = QPushButton("نقل المحدد إلى مجموعة")
-        btn_move.setObjectName("secondaryAction")
-        btn_move.clicked.connect(self._move_selected_to_group)
-        primary_actions.addWidget(btn_move)
-
-        btn_delete = QPushButton("حذف المحدد")
-        btn_delete.setObjectName("btnDanger")
-        btn_delete.clicked.connect(self._delete_selected_contacts)
-        primary_actions.addWidget(btn_delete)
-
-        primary_actions.addStretch()
+        toolbar_layout.addWidget(btn_add)
 
         btn_import_excel = QPushButton("استيراد Excel")
         btn_import_excel.setObjectName("secondaryAction")
-        btn_import_excel.clicked.connect(self._import_excel)
-        primary_actions.addWidget(btn_import_excel)
-
-        btn_import_text = QPushButton("استيراد TXT / CSV")
-        btn_import_text.setObjectName("secondaryAction")
-        btn_import_text.clicked.connect(self._import_txt)
-        primary_actions.addWidget(btn_import_text)
-        filter_layout.addLayout(primary_actions)
-
-        group_actions = QHBoxLayout()
-        group_actions.setSpacing(8)
-        btn_add_group = QPushButton("+ مجموعة جديدة")
-        btn_add_group.setObjectName("secondaryAction")
-        btn_add_group.clicked.connect(self._add_group)
-        group_actions.addWidget(btn_add_group)
-
-        btn_delete_group = QPushButton("حذف المجموعة الحالية")
-        btn_delete_group.setObjectName("btnDanger")
-        btn_delete_group.clicked.connect(self._delete_group)
-        group_actions.addWidget(btn_delete_group)
-
-        group_actions.addStretch()
-
-        import_hint = QLabel(
-            "ملاحظة: عند الاستيراد، إذا كان الرقم ناقص الصفر الأول فسيتم إضافته تلقائيًا."
+        btn_import_excel.setToolTip(
+            "إذا كان رقم الهاتف ناقص الصفر الأول فسيتم إضافته تلقائيًا أثناء الاستيراد"
         )
-        import_hint.setObjectName("importHint")
-        group_actions.addWidget(import_hint)
-        filter_layout.addLayout(group_actions)
+        btn_import_excel.clicked.connect(self._import_excel)
+        toolbar_layout.addWidget(btn_import_excel)
 
-        layout.addWidget(filter_card)
+        more_btn = QPushButton("المزيد ▾")
+        more_btn.setObjectName("secondaryAction")
+        more_menu = QMenu(more_btn)
+
+        action_edit = QAction("تعديل المحدد", more_menu)
+        action_edit.triggered.connect(self._edit_contact)
+        more_menu.addAction(action_edit)
+
+        action_move = QAction("نقل المحدد إلى مجموعة", more_menu)
+        action_move.triggered.connect(self._move_selected_to_group)
+        more_menu.addAction(action_move)
+
+        action_delete = QAction("حذف المحدد", more_menu)
+        action_delete.triggered.connect(self._delete_selected_contacts)
+        more_menu.addAction(action_delete)
+
+        more_menu.addSeparator()
+
+        action_import_text = QAction("استيراد TXT / CSV", more_menu)
+        action_import_text.triggered.connect(self._import_txt)
+        more_menu.addAction(action_import_text)
+
+        action_add_group = QAction("مجموعة جديدة", more_menu)
+        action_add_group.triggered.connect(self._add_group)
+        more_menu.addAction(action_add_group)
+
+        action_delete_group = QAction("حذف المجموعة الحالية", more_menu)
+        action_delete_group.triggered.connect(self._delete_group)
+        more_menu.addAction(action_delete_group)
+
+        more_menu.addSeparator()
+
+        action_clear = QAction("مسح البحث والفلاتر", more_menu)
+        action_clear.triggered.connect(self._clear_filters)
+        more_menu.addAction(action_clear)
+
+        action_delete_all = QAction("حذف جميع جهات الاتصال", more_menu)
+        action_delete_all.triggered.connect(self._delete_all)
+        more_menu.addAction(action_delete_all)
+
+        more_btn.setMenu(more_menu)
+        toolbar_layout.addWidget(more_btn)
+        layout.addWidget(toolbar)
 
         self._table = QTableWidget()
         self._table.setObjectName("contactsTable")
@@ -139,8 +135,15 @@ class ContactsWidget(QWidget):
         self._table.setHorizontalHeaderLabels(
             ["الاسم", "رقم الهاتف", "المجموعة", "المصدر", "ملاحظات"]
         )
-        self._table.horizontalHeader().setStretchLastSection(True)
-        self._table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        header = self._table.horizontalHeader()
+        header.setStretchLastSection(False)
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        header.setSectionResizeMode(1, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(2, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(3, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(4, QHeaderView.Stretch)
+        self._table.verticalHeader().setVisible(False)
+        self._table.verticalHeader().setDefaultSectionSize(34)
         self._table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self._table.setSelectionMode(QAbstractItemView.ExtendedSelection)
         self._table.setEditTriggers(QAbstractItemView.NoEditTriggers)
@@ -151,36 +154,37 @@ class ContactsWidget(QWidget):
         layout.addWidget(self._table, 1)
 
         footer = QHBoxLayout()
+        footer.setSpacing(10)
         self._count_label = QLabel("")
         self._count_label.setObjectName("contactFooter")
         footer.addWidget(self._count_label)
 
-        footer.addStretch()
         self._selection_label = QLabel("المحدد: 0")
         self._selection_label.setObjectName("contactFooter")
         footer.addWidget(self._selection_label)
 
-        btn_delete_all = QPushButton("حذف جميع جهات الاتصال")
-        btn_delete_all.setObjectName("btnDanger")
-        btn_delete_all.clicked.connect(self._delete_all)
-        footer.addWidget(btn_delete_all)
+        footer.addStretch()
+
+        import_hint = QLabel("الاستيراد: الصفر الأول يُضاف تلقائيًا عند نقصه")
+        import_hint.setObjectName("importHint")
+        footer.addWidget(import_hint)
         layout.addLayout(footer)
 
-    def _build_summary_card(self, title: str, value: str):
-        card = QFrame()
-        card.setObjectName("contactSummaryCard")
-        card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(14, 10, 14, 10)
-        card_layout.setSpacing(2)
+    def _build_stat(self, title: str, value: str):
+        box = QFrame()
+        box.setObjectName("contactStat")
+        box_layout = QHBoxLayout(box)
+        box_layout.setContentsMargins(8, 2, 8, 2)
+        box_layout.setSpacing(5)
 
         title_label = QLabel(title)
-        title_label.setObjectName("contactSummaryTitle")
-        card_layout.addWidget(title_label)
+        title_label.setObjectName("contactStatTitle")
+        box_layout.addWidget(title_label)
 
         value_label = QLabel(value)
-        value_label.setObjectName("contactSummaryValue")
-        card_layout.addWidget(value_label)
-        return card, value_label
+        value_label.setObjectName("contactStatValue")
+        box_layout.addWidget(value_label)
+        return box, value_label
 
     def _all_group_names(self) -> list[str]:
         groups = set(self._extra_groups)
