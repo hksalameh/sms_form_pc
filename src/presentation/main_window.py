@@ -135,7 +135,7 @@ class MainWindow(QMainWindow):
         layout.addWidget(subtitle)
         layout.addStretch()
 
-        btn_new = QPushButton("✉  حملة جديدة")
+        btn_new = QPushButton("✉  رسالة جديدة")
         btn_new.setObjectName("topPrimaryButton")
         btn_new.clicked.connect(self._new_campaign)
         layout.addWidget(btn_new)
@@ -168,7 +168,7 @@ class MainWindow(QMainWindow):
         self._nav_group.setExclusive(True)
 
         nav_items = [
-            (self.PAGE_CAMPAIGNS, "✎  إنشاء وإدارة الرسائل"),
+            (self.PAGE_CAMPAIGNS, "✎  عمليات الإرسال"),
             (self.PAGE_CONTACTS, "●  جهات الاتصال"),
             (self.PAGE_REPORTS, "▥  التقارير"),
             (self.PAGE_SETTINGS, "⚙  الإعدادات"),
@@ -303,7 +303,7 @@ class MainWindow(QMainWindow):
         quick_contacts.clicked.connect(lambda: self._show_page(self.PAGE_CONTACTS))
         layout.addWidget(quick_contacts)
 
-        quick_campaigns = QPushButton("الحملات والإرسال")
+        quick_campaigns = QPushButton("عمليات الإرسال")
         quick_campaigns.setObjectName("quickLink")
         quick_campaigns.clicked.connect(lambda: self._show_page(self.PAGE_CAMPAIGNS))
         layout.addWidget(quick_campaigns)
@@ -316,7 +316,7 @@ class MainWindow(QMainWindow):
         layout.addStretch()
 
         hint = QLabel(
-            "يفضل فحص اتصال الهاتف قبل بدء أي حملة إرسال."
+            "يفضل فحص اتصال الهاتف قبل بدء أي عملية إرسال."
         )
         hint.setObjectName("panelHint")
         hint.setWordWrap(True)
@@ -335,12 +335,12 @@ class MainWindow(QMainWindow):
                 "إدارة الأرقام والمجموعات والبحث والاستيراد.",
             ),
             self.PAGE_CAMPAIGNS: (
-                "إنشاء وإدارة الرسائل",
-                "أنشئ حملة جديدة وتابع الإرسال والنتائج من مكان واحد.",
+                "عمليات الإرسال",
+                "أنشئ رسالة جديدة وتابع الإرسال والنتائج من مكان واحد.",
             ),
             self.PAGE_REPORTS: (
                 "التقارير",
-                "راجع نتائج الحملات والرسائل المرسلة والفاشلة.",
+                "راجع نتائج عمليات الإرسال والرسائل المرسلة والفاشلة.",
             ),
             self.PAGE_SETTINGS: (
                 "الإعدادات",
