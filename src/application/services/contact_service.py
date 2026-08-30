@@ -1,5 +1,6 @@
 import os
 import re
+from itertools import chain
 from typing import Optional
 
 from src.domain.entities import Contact
@@ -71,7 +72,6 @@ class ContactService:
         if not digits:
             return ""
 
-        # Jordan international format -> local format.
         if digits.startswith("00962") and len(digits) > 5:
             local = digits[5:].lstrip("0")
             return f"0{local}" if local else ""
@@ -79,7 +79,6 @@ class ContactService:
             local = digits[3:].lstrip("0")
             return f"0{local}" if local else ""
 
-        # Main safeguard requested for Excel/TXT imports: 79... -> 079...
         if not digits.startswith("0"):
             digits = "0" + digits
         return digits
@@ -179,6 +178,9 @@ class ContactService:
                     raw_phone = line
                     name = ""
 
+                if line_no == 1 and self._header_text(raw_phone) in self.PHONE_HEADER_NAMES:
+                    continue
+
                 self._append_import_contact(
                     contacts=contacts,
                     errors=errors,
@@ -231,17 +233,26 @@ class ContactService:
             if not has_header:
                 phone_col = 0
                 name_col = 1 if len(first_row) > 1 else None
-                data_rows = [(1, first_row)]
-                data_rows.extend(enumerate(rows, start=2))
+                data_rows = chain(((1, first_row),), enumerate(rows, start=2))
             else:
                 data_rows = enumerate(rows, start=2)
 
             for row_no, row in data_rows:
-                if not row or all(value is None or self._cell_text(value) == "" for value in row):
+                if not row or all(
+                    value is None or self._cell_text(value) == "" for value in row
+                ):
                     continue
 
-                raw_phone = row[phone_col] if phone_col is not None and phone_col < len(row) else ""
-                name = row[name_col] if name_col is not None and name_col < len(row) else ""
+                raw_phone = (
+                    row[phone_col]
+                    if phone_col is not None and phone_col < len(row)
+                    else ""
+                )
+                name = (
+                    row[name_col]
+                    if name_col is not None and name_col < len(row)
+                    else ""
+                )
                 group = (
                     row[group_col]
                     if group_col is not None and group_col < len(row)
