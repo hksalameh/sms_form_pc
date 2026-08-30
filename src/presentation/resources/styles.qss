@@ -399,3 +399,90 @@ QMessageBox,
 QDialog {
     background: #f5f7fb;
 }
+
+/* ---------- Integrated send workspace ---------- */
+QPushButton#workspaceModeButton {
+    background: #f8fafc;
+    color: #475569;
+    border: 1px solid #dbe4ef;
+    min-width: 135px;
+}
+
+QPushButton#workspaceModeButton:hover {
+    background: #eef7ff;
+    color: #1268ba;
+    border-color: #b9d5ef;
+}
+
+QPushButton#workspaceModeButton:checked {
+    background: #e7f2ff;
+    color: #1268ba;
+    border-color: #8fc0eb;
+    font-weight: 800;
+}
+
+QStackedWidget#sendWorkspace,
+QWidget#composerPage,
+QWidget#historyPage {
+    background: transparent;
+}
+
+QFrame#composerCard {
+    background: #fbfdff;
+    border: 1px solid #dbe4ef;
+    border-radius: 9px;
+}
+
+QLabel#sectionTitle {
+    color: #145fa5;
+    font-size: 18px;
+    font-weight: 800;
+}
+
+QLabel#fieldLabel {
+    color: #334155;
+    font-size: 12px;
+    font-weight: 700;
+    min-width: 92px;
+}
+
+QTextEdit#messageEditor {
+    background: #ffffff;
+    border: 1px solid #b9c9d9;
+    border-radius: 8px;
+    padding: 10px;
+    font-size: 14px;
+}
+
+QTextEdit#messageEditor:focus {
+    border: 1px solid #1677d2;
+}
+
+QLabel#messageMeta {
+    color: #64748b;
+    font-size: 11px;
+}
+
+QLabel#messageMetaStrong {
+    color: #145fa5;
+    font-size: 12px;
+    font-weight: 800;
+}
+
+QPushButton#secondaryAction {
+    background: #ffffff;
+    color: #334155;
+    border: 1px solid #cbd5e1;
+}
+
+QPushButton#secondaryAction:hover {
+    background: #f8fafc;
+    color: #1268ba;
+    border-color: #94a3b8;
+}
+
+QFrame#composerActionBar {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+}
