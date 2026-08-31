@@ -74,14 +74,33 @@ jobs:
         shell: pwsh
         run: |
           pyinstaller --noconfirm --clean --onedir --windowed --noupx `
+            --contents-directory "." `
             --name "SmsHks-Portable" `
             --icon "src/presentation/resources/smshks.ico" `
+            --runtime-hook "tools/runtime_adb.py" `
             --add-data "src/presentation/resources;src/presentation/resources" `
             --add-data "bundle/android/SmsHks-Phone.apk;android" `
             --add-binary "bundle/adb/adb.exe;adb" `
             --add-binary "bundle/adb/AdbWinApi.dll;adb" `
             --add-binary "bundle/adb/AdbWinUsbApi.dll;adb" `
             main.py
+
+      - name: Verify bundled ADB
+        shell: pwsh
+        run: |
+          $adb = "dist\SmsHks-Portable\adb\adb.exe"
+          if (-not (Test-Path $adb)) {
+            throw "Bundled adb.exe is missing from portable output"
+          }
+          & $adb version
+          if ($LASTEXITCODE -ne 0) {
+            throw "Bundled adb.exe could not start"
+          }
+          & $adb start-server
+          if ($LASTEXITCODE -ne 0) {
+            throw "Bundled ADB server could not start"
+          }
+          & $adb kill-server
 
       - name: Create portable ZIP
         shell: pwsh
